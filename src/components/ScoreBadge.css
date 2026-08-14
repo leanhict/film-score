@@ -1,0 +1,202 @@
+.score-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: all var(--transition-fast);
+}
+
+.score-badge:hover {
+  transform: translateY(-1px);
+}
+
+.score-badge-small {
+  padding: 2px 6px;
+  font-size: 0.75rem;
+  gap: 4px;
+}
+
+.score-badge-large {
+  padding: 8px 16px;
+  font-size: 1rem;
+  gap: 12px;
+  border-radius: var(--radius-md);
+}
+
+/* IMDb */
+.score-badge-imdb {
+  background: var(--imdb-bg);
+  border-color: var(--imdb-border);
+}
+
+.imdb-icon {
+  background: var(--imdb-gold);
+  color: #000;
+  font-weight: 900;
+  font-size: 0.7rem;
+  padding: 2px 4px;
+  border-radius: 3px;
+  letter-spacing: -0.02em;
+}
+
+.star-icon {
+  color: var(--imdb-gold);
+  font-size: 0.9em;
+}
+
+/* RT Critic */
+.score-badge-rt-critic {
+  background: var(--rt-critic-bg);
+  border-color: rgba(250, 50, 10, 0.35);
+}
+
+/* RT Audience */
+.score-badge-rt-audience {
+  background: var(--rt-popcorn-bg);
+  border-color: rgba(249, 200, 14, 0.35);
+}
+
+/* Metacritic */
+.score-badge-metacritic {
+  background: rgba(102, 204, 51, 0.1);
+  border-color: rgba(102, 204, 51, 0.3);
+}
+
+.mc-box {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.75rem;
+  border-radius: 4px;
+  color: #fff;
+}
+
+.mc-green { background: #66cc33; color: #000; }
+.mc-yellow { background: #ffcc33; color: #000; }
+.mc-red { background: #ff0000; }
+
+.source-name {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  display: block;
+  line-height: 1;
+}
+
+.score-main {
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.1;
+}
+
+.score-sub {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.source-emoji {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+/* UNIFIED SCORE RING */
+.score-badge-unified {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: rgba(15, 18, 27, 0.85);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.15);
+}
+
+.score-badge-unified.score-badge-large {
+  padding: 12px 20px;
+  border-radius: var(--radius-lg);
+}
+
+.unified-ring {
+  position: relative;
+  width: 44px;
+  height: 44px;
+}
+
+.score-badge-large .unified-ring {
+  width: 60px;
+  height: 60px;
+}
+
+.circular-chart {
+  display: block;
+  margin: 0 auto;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.circle-bg {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.08);
+  stroke-width: 3.5;
+}
+
+.circle {
+  fill: none;
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  transition: stroke-dasharray 0.8s ease-in-out;
+}
+
+.unified-value {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.unified-value .score-num {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.score-badge-large .unified-value .score-num {
+  font-size: 1.4rem;
+}
+
+.unified-value .score-max {
+  font-size: 0.55rem;
+  color: var(--text-muted);
+}
+
+.unified-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.unified-title {
+  font-size: 0.85rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: var(--grad-unified);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.unified-sub {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}

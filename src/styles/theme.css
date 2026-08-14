@@ -1,0 +1,74 @@
+:root {
+  /* Core Color Palette */
+  --bg-primary: #08090e;
+  --bg-secondary: #0f121b;
+  --bg-tertiary: #161b26;
+  --bg-card: rgba(22, 27, 38, 0.7);
+  --bg-card-hover: rgba(30, 37, 52, 0.85);
+  --bg-glass: rgba(15, 18, 27, 0.75);
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-highlight: rgba(255, 255, 255, 0.18);
+  
+  /* Text Colors */
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --text-inverse: #090d16;
+
+  /* Source Brand Colors */
+  --imdb-gold: #f5c518;
+  --imdb-bg: rgba(245, 197, 24, 0.15);
+  --imdb-border: rgba(245, 197, 24, 0.4);
+
+  --rt-critic: #fa320a;
+  --rt-critic-bg: rgba(250, 50, 10, 0.15);
+  --rt-rotten: #6bb343;
+  --rt-popcorn: #f9c80e;
+  --rt-popcorn-bg: rgba(249, 200, 14, 0.15);
+
+  --mc-green: #66cc33;
+  --mc-green-bg: rgba(102, 204, 51, 0.15);
+  --mc-yellow: #ffcc33;
+  --mc-yellow-bg: rgba(255, 204, 51, 0.15);
+  --mc-red: #ff0000;
+  --mc-red-bg: rgba(255, 0, 0, 0.15);
+
+  /* Unified Score Accent */
+  --accent-cyan: #06b6d4;
+  --accent-indigo: #6366f1;
+  --accent-violet: #8b5cf6;
+  --accent-rose: #f43f5e;
+  --accent-emerald: #10b981;
+  --accent-amber: #f59e0b;
+  
+  /* Gradients */
+  --grad-unified: linear-gradient(135deg, #6366f1 0%, #06b6d4 100%);
+  --grad-masterpiece: linear-gradient(135deg, #f59e0b 0%, #d97706 50%, #b45309 100%);
+  --grad-critic: linear-gradient(135deg, #fa320a 0%, #e11d48 100%);
+  --grad-audience: linear-gradient(135deg, #f59e0b 0%, #eab308 100%);
+  --grad-polarizing: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+  --grad-hero-overlay: linear-gradient(to top, #08090e 5%, rgba(8, 9, 14, 0.8) 50%, rgba(8, 9, 14, 0.2) 100%);
+
+  /* Shadows & Glows */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.7);
+  --glow-accent: 0 0 24px rgba(99, 102, 241, 0.25);
+  --glow-gold: 0 0 24px rgba(245, 197, 24, 0.3);
+
+  /* Typography */
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-display: 'Outfit', var(--font-sans);
+
+  /* Radius */
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-full: 9999px;
+
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-spring: 400ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
