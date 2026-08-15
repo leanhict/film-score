@@ -3,10 +3,23 @@ import { searchMovieWithGemini, loadCandidateDetails, getStoredGeminiKey } from 
 import { ScoreBadge } from './ScoreBadge';
 import { calculateUnifiedScore, getMovieBadge } from '../services/scoreEngine';
 import { AudioPlotReader } from './AudioPlotReader';
-import { Sparkles, Search, Loader2, CheckCircle2, AlertCircle, ArrowRight, Key, Film, Plus, Layers, Check } from 'lucide-react';
+import {
+  Sparkles,
+  Search,
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
+  Key,
+  Plus,
+  Layers,
+  Check,
+  Star,
+  Film
+} from 'lucide-react';
 import './AISearchModal.css';
 
 const SEARCH_SUGGESTIONS = [
+  'Disclosure Day (2026)',
   'The Last House (2026)',
   'Mai (2024)',
   'Đào, Phở và Piano',
@@ -15,7 +28,6 @@ const SEARCH_SUGGESTIONS = [
   'Deadpool & Wolverine',
   'Inside Out 2',
   'Dune: Part Two',
-  'Bố Già (Trấn Thành)',
   'Alien: Romulus'
 ];
 
@@ -102,74 +114,110 @@ export function AISearchModal({
 
   if (!isOpen) return null;
 
+  const isShowingResults = searchResult || isLoading || error;
+
+  // Sắp xếp danh sách ứng viên theo Năm giảm dần (mới nhất lên đầu)
+  const sortedCandidates = (searchResult?.candidates || []).slice().sort((a, b) => {
+    const yearA = parseInt(a.year, 10) || 0;
+    const yearB = parseInt(b.year, 10) || 0;
+    if (yearB !== yearA) return yearB - yearA;
+    return (a.rank || 99999) - (b.rank || 99999);
+  });
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="ai-search-modal glass-modal" onClick={(e) => e.stopPropagation()}>
-        {/* HEADER */}
-        <div className="ai-header">
-          <div className="ai-header-title-wrap">
-            <div className="ai-gemini-icon">
-              <Sparkles size={20} />
+        {/* SLIM TOPBAR KHI ĐÃ CÓ KẾT QUẢ / ĐANG TÌM KIẾM (LOẠI BỎ KHỐI BANNER LỚN ẢNH 1) */}
+        {isShowingResults ? (
+          <div className="ai-modal-topbar">
+            <div className="ai-modal-query-pill">
+              <Sparkles size={16} className="ai-sparkle-pill-icon" />
+              <span className="ai-modal-query-text">
+                Kết quả tra cứu AI cho: <strong>"{query}"</strong>
+              </span>
             </div>
-            <div>
-              <h3>Tra Cứu Phim Đa Nguồn Với Gemini AI</h3>
-              <p className="ai-header-sub">
-                Tự động tìm kiếm thời gian thực điểm số từ IMDb, Rotten Tomatoes & Metacritic
-              </p>
+
+            <div className="ai-modal-topbar-actions">
+              <button
+                className="ai-re-search-btn"
+                onClick={() => {
+                  setSearchResult(null);
+                  setError(null);
+                }}
+                title="Nhập tên phim khác để tra cứu"
+              >
+                <Search size={14} /> <span>Tìm phim khác</span>
+              </button>
+              <button className="ai-modal-close-icon-btn" onClick={onClose} title="Đóng">✕</button>
             </div>
           </div>
-          <button className="ai-close-btn" onClick={onClose}>✕</button>
-        </div>
+        ) : (
+          /* HEADER & SEARCH FORM BAN ĐẦU KHI CHƯA GÕ TÌM KIẾM */
+          <div className="ai-initial-search-container">
+            <div className="ai-header">
+              <div className="ai-header-title-wrap">
+                <div className="ai-gemini-icon">
+                  <Sparkles size={20} />
+                </div>
+                <div>
+                  <h3>Tra Cứu Phim Đa Nguồn Với Gemini AI</h3>
+                  <p className="ai-header-sub">
+                    Tự động tìm kiếm thời gian thực điểm số từ IMDb, Rotten Tomatoes & Metacritic
+                  </p>
+                </div>
+              </div>
+              <button className="ai-close-btn" onClick={onClose}>✕</button>
+            </div>
 
-        {/* SEARCH INPUT BAR */}
-        <div className="ai-search-form">
-          <div className="ai-input-wrap">
-            <Search className="ai-search-icon" size={18} />
-            <input
-              type="text"
-              className="ai-input"
-              placeholder="Nhập tên bất kỳ bộ phim nào (ví dụ: The Last House 2026, Mai, Dune 2...)"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              disabled={isLoading}
-              autoFocus
-            />
-          </div>
-          <button
-            className="ai-submit-btn"
-            onClick={() => handleSearch()}
-            disabled={isLoading || !query.trim()}
-          >
-            {isLoading ? (
-              <>
-                <Loader2 size={18} className="spin-icon" /> Đang Tra Cứu...
-              </>
-            ) : (
-              <>
-                <Sparkles size={18} /> Tìm Với AI
-              </>
-            )}
-          </button>
-        </div>
+            {/* SEARCH INPUT BAR */}
+            <div className="ai-search-form">
+              <div className="ai-input-wrap">
+                <Search className="ai-search-icon" size={18} />
+                <input
+                  type="text"
+                  className="ai-input"
+                  placeholder="Nhập tên bất kỳ bộ phim nào (ví dụ: Disclosure Day, Mai, Dune 2...)"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                  disabled={isLoading}
+                  autoFocus
+                />
+              </div>
+              <button
+                className="ai-submit-btn"
+                onClick={() => handleSearch()}
+                disabled={isLoading || !query.trim()}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 size={18} className="spin-icon" /> Đang Tra Cứu...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={18} /> Tìm Với AI
+                  </>
+                )}
+              </button>
+            </div>
 
-        {/* QUICK SUGGESTIONS */}
-        {!searchResult && !isLoading && (
-          <div className="ai-suggestions-section">
-            <span className="suggestions-label">Gợi ý tìm nhanh:</span>
-            <div className="suggestions-list">
-              {SEARCH_SUGGESTIONS.map((item, idx) => (
-                <button
-                  key={idx}
-                  className="suggestion-chip"
-                  onClick={() => {
-                    setQuery(item);
-                    handleSearch(item);
-                  }}
-                >
-                  {item}
-                </button>
-              ))}
+            {/* QUICK SUGGESTIONS */}
+            <div className="ai-suggestions-section">
+              <span className="suggestions-label">Gợi ý tìm nhanh:</span>
+              <div className="suggestions-list">
+                {SEARCH_SUGGESTIONS.map((item, idx) => (
+                  <button
+                    key={idx}
+                    className="suggestion-chip"
+                    onClick={() => {
+                      setQuery(item);
+                      handleSearch(item);
+                    }}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}
@@ -206,25 +254,38 @@ export function AISearchModal({
         )}
 
         {/* ERROR STATE */}
-        {error && (
+        {error && !isLoading && (
           <div className="ai-error-banner">
             <AlertCircle size={20} />
-            <span>{error}</span>
+            <div className="ai-error-text-wrap">
+              <span>{error}</span>
+              <button
+                className="ai-try-again-btn"
+                onClick={() => {
+                  setSearchResult(null);
+                  setError(null);
+                }}
+              >
+                Nhập tên phim khác
+              </button>
+            </div>
           </div>
         )}
 
-        {/* SEARCH RESULT CARD */}
+        {/* SEARCH RESULT CONTAINER */}
         {searchResult && !isLoading && (
-          <div className="ai-result-container glass-panel animate-fade-in">
-            {/* OTHER MATCHING CANDIDATES IF MULTIPLE MOVIES FOUND */}
-            {searchResult.candidates && searchResult.candidates.length > 1 && (
+          <div className="ai-result-container animate-fade-in">
+            {/* OTHER MATCHING CANDIDATES SORTED BY YEAR DESCENDING WITH IMDB SCORES */}
+            {sortedCandidates.length > 1 && (
               <div className="matching-candidates-box">
                 <div className="candidates-header">
-                  <Layers size={15} />
-                  <span>Các tác phẩm cùng tên / liên quan trên IMDb ({searchResult.candidates.length}):</span>
+                  <Layers size={14} />
+                  <span>
+                    Tìm thấy {sortedCandidates.length} tác phẩm cùng tên / liên quan trên IMDb (sắp xếp mới nhất):
+                  </span>
                 </div>
                 <div className="candidates-list-scroll">
-                  {searchResult.candidates.map(cand => {
+                  {sortedCandidates.map(cand => {
                     const isSelected = cand.imdbID === searchResult.id;
                     return (
                       <div
@@ -242,12 +303,22 @@ export function AISearchModal({
                           />
                         )}
                         <div className="cand-info">
-                          <span className="cand-title">{cand.title}</span>
-                          <span className="cand-year">{cand.year ? `${cand.year}` : 'N/A'} {cand.cast ? `• ${cand.cast}` : ''}</span>
+                          <div className="cand-title-row">
+                            <span className="cand-title">{cand.title}</span>
+                            {cand.year && <span className="cand-year-badge">{cand.year}</span>}
+                          </div>
+                          <div className="cand-sub-row">
+                            {cand.imdbRating ? (
+                              <span className="cand-imdb-pill">★ {cand.imdbRating}</span>
+                            ) : (
+                              <span className="cand-imdb-pill cand-imdb-na">★ IMDb</span>
+                            )}
+                            {cand.cast && <span className="cand-cast-text">• {cand.cast}</span>}
+                          </div>
                         </div>
                         {isSelected && (
                           <span className="cand-check-badge">
-                            <Check size={12} /> Đang chọn
+                            <Check size={11} /> Đang xem
                           </span>
                         )}
                       </div>
@@ -257,112 +328,147 @@ export function AISearchModal({
               </div>
             )}
 
-            <div className="result-top-badge">
-              <Sparkles size={14} /> Nguồn dữ liệu: <strong>{searchResult.source || 'IMDb, Rotten Tomatoes & Metacritic'}</strong>
-            </div>
-
-            {isSwitching ? (
-              <div className="switching-loading-box">
-                <Loader2 size={24} className="spin-icon" />
-                <span>Đang tải thông tin và điểm số bản phát hành đã chọn...</span>
-              </div>
-            ) : (
-              <div className="result-content-grid">
-                <div className="result-poster-wrap">
-                  <img
-                    src={searchResult.poster}
-                    alt={searchResult.title}
-                    className="result-poster-img"
-                    onError={(e) => {
-                      e.target.onerror = null;
-                      e.target.src = 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=800&q=80';
-                    }}
-                  />
+            {/* MAIN COMPACT MOVIE RESULT CARD */}
+            <div className="result-main-card glass-panel">
+              <div className="result-top-info-strip">
+                <div className="result-source-chip">
+                  <Sparkles size={13} /> {searchResult.source || 'Nguồn IMDb, Rotten Tomatoes & Metacritic'}
                 </div>
+                {searchResult.country && (
+                  <span className="result-country-tag">📍 {searchResult.country}</span>
+                )}
+              </div>
 
-                <div className="result-info-wrap">
-                  <h4 className="result-title">
-                    {searchResult.vietnameseTitle || searchResult.title}
-                  </h4>
-                  {searchResult.vietnameseTitle && searchResult.vietnameseTitle !== searchResult.title && (
-                    <span className="result-sub">{searchResult.title}</span>
-                  )}
+              {isSwitching ? (
+                <div className="switching-loading-box">
+                  <Loader2 size={24} className="spin-icon" />
+                  <span>Đang cập nhật điểm số và thông tin bản phát hành...</span>
+                </div>
+              ) : (
+                <div className="result-layout-wrapper">
+                  {/* COMPACT POSTER & METRICS ROW */}
+                  <div className="result-hero-row">
+                    <div className="result-poster-wrap">
+                      <img
+                        src={searchResult.poster}
+                        alt={searchResult.title}
+                        className="result-poster-img"
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=800&q=80';
+                        }}
+                      />
+                    </div>
 
-                  <div className="result-meta">
-                    <span className="result-year-badge">{searchResult.year}</span>
-                    <span>•</span>
-                    <span>{searchResult.runtime}</span>
-                    <span>•</span>
-                    <span>Đạo diễn: {searchResult.director}</span>
+                    <div className="result-primary-info">
+                      <div className="result-title-group">
+                        <h4 className="result-title">
+                          {searchResult.vietnameseTitle || searchResult.title}
+                        </h4>
+                        {searchResult.vietnameseTitle && searchResult.vietnameseTitle !== searchResult.title && (
+                          <span className="result-sub-title">{searchResult.title}</span>
+                        )}
+                      </div>
+
+                      <div className="result-meta-line">
+                        <span className="result-year-badge">{searchResult.year}</span>
+                        <span>•</span>
+                        <span>{searchResult.runtime || 'N/A'}</span>
+                        {searchResult.director && searchResult.director !== 'N/A' && (
+                          <>
+                            <span>•</span>
+                            <span>Đạo diễn: {searchResult.director}</span>
+                          </>
+                        )}
+                      </div>
+
+                      {searchResult.genres && (
+                        <div className="result-genres-row">
+                          {searchResult.genres.map((g, i) => (
+                            <span key={i} className="result-genre-pill">{g}</span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* COMPACT SCORES STRIP */}
+                      <div className="result-scores-row">
+                        <ScoreBadge
+                          type="unified"
+                          score={calculateUnifiedScore(searchResult.ratings)}
+                          size="small"
+                        />
+                        <ScoreBadge
+                          type="imdb"
+                          score={searchResult.ratings?.imdb}
+                          votes={searchResult.ratings?.imdbVotes}
+                        />
+                        <ScoreBadge
+                          type="rtCritics"
+                          score={searchResult.ratings?.rtCritics}
+                        />
+                        <ScoreBadge
+                          type="rtAudience"
+                          score={searchResult.ratings?.rtAudience}
+                        />
+                        <ScoreBadge
+                          type="metacritic"
+                          score={searchResult.ratings?.metascore}
+                        />
+                      </div>
+                    </div>
                   </div>
 
-                  {/* SCORES SUMMARY */}
-                  <div className="result-scores-row">
-                    <ScoreBadge
-                      type="unified"
-                      score={calculateUnifiedScore(searchResult.ratings)}
-                      size="medium"
-                    />
-                    <ScoreBadge
-                      type="imdb"
-                      score={searchResult.ratings?.imdb}
-                      votes={searchResult.ratings?.imdbVotes}
-                    />
-                    <ScoreBadge
-                      type="rtCritics"
-                      score={searchResult.ratings?.rtCritics}
-                    />
-                    <ScoreBadge
-                      type="rtAudience"
-                      score={searchResult.ratings?.rtAudience}
-                    />
-                    <ScoreBadge
-                      type="metacritic"
-                      score={searchResult.ratings?.metascore}
-                    />
-                  </div>
-
+                  {/* AUDIO SPOILER PLOT READER */}
                   {(searchResult.detailedPlot || searchResult.synopsis) && (
-                    <AudioPlotReader
-                      text={searchResult.detailedPlot || searchResult.synopsis}
-                      title="Tóm Tắt Cốt Truyện & Diễn Biến"
-                      spoilerTag="Spoiler • Tiết lộ nội dung"
-                    />
+                    <div className="result-plot-box">
+                      <AudioPlotReader
+                        text={searchResult.detailedPlot || searchResult.synopsis}
+                        title="Tóm Tắt Cốt Truyện & Diễn Biến"
+                        spoilerTag="Spoiler • Tiết lộ nội dung"
+                      />
+                    </div>
                   )}
 
+                  {/* CRITIC CONSENSUS */}
                   {searchResult.criticConsensus && (
                     <div className="result-consensus-box">
                       <strong>Nhận định chuyên môn:</strong> {searchResult.criticConsensus}
                     </div>
                   )}
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* ACTION BUTTONS */}
-            <div className="result-actions-footer">
-              <button className="ai-btn-secondary" onClick={() => handleSearch()}>
-                Tra cứu lại
-              </button>
-              <button className="ai-btn-primary" onClick={handleImport}>
-                <Plus size={18} /> Thêm Vào Kho Phim & Xem Chi Tiết
-              </button>
+              {/* ACTION BUTTONS */}
+              <div className="result-actions-footer">
+                <button
+                  className="ai-btn-secondary"
+                  onClick={() => {
+                    setSearchResult(null);
+                    setError(null);
+                  }}
+                >
+                  <Search size={15} /> Tìm Phim Khác
+                </button>
+                <button className="ai-btn-primary" onClick={handleImport}>
+                  <Plus size={17} /> Thêm Vào Kho Phim & Xem Chi Tiết
+                </button>
+              </div>
             </div>
           </div>
         )}
 
         {/* FOOTER TIP */}
         <div className="ai-footer-tip">
-          <Key size={14} className="key-icon" />
+          <Key size={13} className="key-icon" />
           <span>
             {hasKey ? (
-              <span className="key-active-text">Đang sử dụng Google Gemini API Key riêng của bạn.</span>
+              <span className="key-active-text">Đang kết nối Google Gemini AI API riêng.</span>
             ) : (
-              <span>Đang ở chế độ sẵn sàng. Bạn có thể thêm Gemini API Key trong phần Cài đặt để tra cứu không giới hạn.</span>
+              <span>Chế độ Live API trực tiếp từ IMDb, Rotten Tomatoes và Metacritic.</span>
             )}
           </span>
           <button className="open-settings-link" onClick={() => { onClose(); onOpenSettings(); }}>
-            Quản lý Key →
+            Cài đặt Key →
           </button>
         </div>
       </div>

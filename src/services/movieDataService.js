@@ -5,6 +5,7 @@
  */
 
 import { getStoredGeminiKey } from './geminiService.js';
+import { VIETNAMESE_TITLE_MAP, removeVietnameseTones, normalizeSearchString } from '../utils/searchUtils.js';
 
 // Danh sách các API keys dự phòng cho OMDb
 const OMDB_KEY_POOL = ['trilogy', 'b9bd48a6', '7c86a512'];
@@ -61,7 +62,27 @@ function translateGenres(genreStr = '') {
 }
 
 function removeAccents(str) {
-  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
+  return removeVietnameseTones(str);
+}
+
+/**
+ * Tự động dịch tên phim hoặc cụm từ tiếng Việt sang tiếng Anh để tra cứu quốc tế
+ */
+export async function translateToEnglish(text) {
+  if (!text || text === 'N/A') return '';
+  try {
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=vi&tl=en&dt=t&q=${encodeURIComponent(text.trim())}`;
+    const res = await fetch(url);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data[0])) {
+        return data[0].map(item => item[0]).join('').trim();
+      }
+    }
+  } catch (e) {
+    console.warn('Lỗi dịch sang tiếng Anh:', e);
+  }
+  return '';
 }
 
 function unescapeHtml(str) {
@@ -172,6 +193,7 @@ export function buildVietnameseDetailedPlot(title, year, genres, director, cast,
 
 /**
  * Tìm kiếm danh sách các tác phẩm khớp từ khóa trên IMDb & OMDb (Multi-candidate Search)
+ * Hỗ trợ nhận diện tên phim tiếng Việt chính xác
  */
 export async function searchMovieCandidates(rawQuery) {
   const query = rawQuery.trim();
@@ -183,9 +205,26 @@ export async function searchMovieCandidates(rawQuery) {
   const cleanTitle = query.replace(/\b(19\d\d|20\d\d)\b/g, '').replace(/[()]/g, '').trim();
 
   const searchTitles = [cleanTitle];
-  const unaccented = removeAccents(cleanTitle);
-  if (unaccented.toLowerCase() !== cleanTitle.toLowerCase()) {
+
+  // 1. Ánh xạ tên phim tiếng Việt phổ biến sang tên gốc tiếng Anh
+  const normClean = normalizeSearchString(cleanTitle);
+  const mapped = VIETNAMESE_TITLE_MAP[cleanTitle.toLowerCase()] || VIETNAMESE_TITLE_MAP[normClean];
+  if (mapped && !searchTitles.includes(mapped)) {
+    searchTitles.unshift(mapped);
+  }
+
+  // 2. Thêm phiên bản không dấu
+  const unaccented = removeVietnameseTones(cleanTitle);
+  if (unaccented && unaccented.toLowerCase() !== cleanTitle.toLowerCase() && !searchTitles.includes(unaccented)) {
     searchTitles.push(unaccented);
+  }
+
+  // 3. Nếu từ khóa có dấu tiếng Việt và chưa có trong từ điển, dịch tự động sang tiếng Anh
+  if (unaccented.toLowerCase() !== cleanTitle.toLowerCase() && !mapped) {
+    const enTrans = await translateToEnglish(cleanTitle);
+    if (enTrans && !searchTitles.includes(enTrans)) {
+      searchTitles.push(enTrans);
+    }
   }
 
   const candidatesMap = new Map();
@@ -254,14 +293,32 @@ export async function searchMovieCandidates(rawQuery) {
 
   const list = Array.from(candidatesMap.values());
 
-  // Sắp xếp ưu tiên: Khớp đúng năm -> Độ phổ biến / Rank
+  // Sắp xếp theo Năm sản xuất giảm dần (Mới nhất lên đầu)
   list.sort((a, b) => {
-    if (targetYear) {
-      if (a.year === targetYear && b.year !== targetYear) return -1;
-      if (b.year === targetYear && a.year !== targetYear) return 1;
-    }
+    const yearA = parseInt(a.year, 10) || 0;
+    const yearB = parseInt(b.year, 10) || 0;
+    if (yearB !== yearA) return yearB - yearA;
     return (a.rank || 99999) - (b.rank || 99999);
   });
+
+  // Lấy thêm điểm số IMDb cho các ứng viên hàng đầu để hiển thị ngay trên thẻ
+  const topCandidates = list.slice(0, 10);
+  const activeOmdbKey = userKey || 'trilogy';
+  await Promise.allSettled(
+    topCandidates.map(async (cand) => {
+      try {
+        const res = await fetch(`https://www.omdbapi.com/?i=${cand.imdbID}&apikey=${activeOmdbKey}`);
+        if (res.ok) {
+          const d = await res.json();
+          if (d.Response === 'True') {
+            cand.imdbRating = d.imdbRating !== 'N/A' ? d.imdbRating : null;
+            if (!cand.poster && d.Poster !== 'N/A') cand.poster = d.Poster;
+            if (!cand.cast && d.Actors !== 'N/A') cand.cast = d.Actors;
+          }
+        }
+      } catch (e) {}
+    })
+  );
 
   return list;
 }

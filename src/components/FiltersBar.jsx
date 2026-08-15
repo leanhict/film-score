@@ -1,17 +1,9 @@
 import React from 'react';
-import { Filter, ArrowUpDown, X, Sparkles } from 'lucide-react';
+import { ArrowUpDown, X, Sparkles, Flame } from 'lucide-react';
+import { NETFLIX_CATEGORIES } from '../services/netflixCatalogService';
 import './FiltersBar.css';
 
-export const CATEGORIES = [
-  { id: 'all', label: 'Tất Cả Phim', icon: '🎬' },
-  { id: 'masterpiece', label: 'Kiệt Tác (≥ 85đ)', icon: '👑' },
-  { id: 'vietnam', label: 'Phim Việt Nam', icon: '🇻🇳' },
-  { id: 'critic_darling', label: 'Phê Bình Ca Ngợi', icon: '🎭' },
-  { id: 'audience_favorite', label: 'Khán Giả Mê', icon: '🍿' },
-  { id: 'polarizing', label: 'Gây Tranh Cãi', icon: '⚡' },
-  { id: 'hidden_gem', label: 'Hạt Ngọc Ẩn', icon: '💎' },
-  { id: 'guilty_pleasure', label: 'Xem Giải Trí', icon: '🎉' },
-];
+export const CATEGORIES = NETFLIX_CATEGORIES;
 
 export const SORT_OPTIONS = [
   { id: 'unified_desc', label: '🏆 FilmScore cao nhất' },
@@ -32,15 +24,16 @@ export function FiltersBar({
   sortBy,
   onSortChange,
   onResetFilters,
-  totalResults
+  totalResults,
+  isLoadingCategory = false
 }) {
-  const isFiltered = activeCategory !== 'all' || selectedGenre !== 'all' || minScore > 0 || sortBy !== 'unified_desc';
+  const isFiltered = activeCategory !== 'netflix_trending' || selectedGenre !== 'all' || minScore > 0 || sortBy !== 'unified_desc';
 
   return (
     <div className="filters-bar-container">
-      {/* CATEGORY PILLS SCROLLABLE */}
+      {/* CATEGORY PILLS SCROLLABLE (NETFLIX CATEGORIES) */}
       <div className="category-pills-row">
-        {CATEGORIES.map(cat => (
+        {NETFLIX_CATEGORIES.map(cat => (
           <button
             key={cat.id}
             className={`cat-pill-btn ${activeCategory === cat.id ? 'active' : ''}`}
@@ -56,7 +49,11 @@ export function FiltersBar({
       <div className="filter-controls-row">
         <div className="results-count-wrap">
           <span className="results-count">
-            Hiển thị <strong>{totalResults}</strong> tác phẩm
+            {isLoadingCategory ? (
+              <span className="loading-cat-text">Đang cập nhật thời gian thực...</span>
+            ) : (
+              <>Hiển thị <strong>{totalResults}</strong> tác phẩm Netflix</>
+            )}
           </span>
         </div>
 
@@ -90,7 +87,7 @@ export function FiltersBar({
           </div>
 
           {/* SORT DROPDOWN */}
-          <div className="filter-select-item">
+          <div className="filter-select-item sort-item">
             <ArrowUpDown size={14} className="sort-icon" />
             <select
               value={sortBy}

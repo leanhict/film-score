@@ -40,9 +40,9 @@ export function MovieCard({
           <span className="score-label">FilmScore</span>
         </div>
 
-        {/* VIETNAMESE CLASSIFICATION BADGE */}
+        {/* VIETNAMESE CLASSIFICATION BADGE (Desktop) */}
         {badge && (
-          <div className="floating-category-badge">
+          <div className="floating-category-badge desktop-only-badge">
             <span className={`badge ${badge.className}`}>
               <span>{badge.icon}</span> {badge.shortLabel}
             </span>
@@ -83,24 +83,45 @@ export function MovieCard({
           <span className="card-year">{movie.year}</span>
           <span className="meta-dot">•</span>
           <span className="card-runtime">{movie.runtime}</span>
+
+          {badge && (
+            <span className={`card-inline-badge ${badge.className}`}>
+              {badge.icon} {badge.shortLabel}
+            </span>
+          )}
+
           {movie.country === 'Việt Nam' && (
             <>
               <span className="meta-dot">•</span>
-              <span className="vietnam-tag">🇻🇳 Phim Việt</span>
+              <span className="vietnam-tag">🇻🇳 Việt Nam</span>
             </>
+          )}
+
+          {/* Quick Bookmark Button for Mobile */}
+          <button
+            className={`card-quick-bookmark ${isWatchlisted ? 'active' : ''}`}
+            title={isWatchlisted ? 'Đã lưu trong danh sách' : 'Lưu vào muốn xem'}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleWatchlist && onToggleWatchlist(movie);
+            }}
+          >
+            <Bookmark size={13} fill={isWatchlisted ? 'currentColor' : 'none'} />
+          </button>
+        </div>
+
+        <div className="card-title-wrap">
+          <h3 className="card-title" title={movie.vietnameseTitle || movie.title}>
+            {movie.vietnameseTitle || movie.title}
+          </h3>
+          {movie.vietnameseTitle && movie.vietnameseTitle !== movie.title && (
+            <h4 className="card-sub-title">{movie.title}</h4>
           )}
         </div>
 
-        <h3 className="card-title" title={movie.vietnameseTitle || movie.title}>
-          {movie.vietnameseTitle || movie.title}
-        </h3>
-        {movie.vietnameseTitle && movie.vietnameseTitle !== movie.title && (
-          <h4 className="card-sub-title">{movie.title}</h4>
-        )}
-
         {/* GENRE TAGS */}
         <div className="card-genres">
-          {movie.genres?.slice(0, 2).map((genre, idx) => (
+          {movie.genres?.slice(0, 3).map((genre, idx) => (
             <span key={idx} className="genre-pill">{genre}</span>
           ))}
         </div>

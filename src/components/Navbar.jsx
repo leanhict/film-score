@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { calculateUnifiedScore } from '../services/scoreEngine';
+import { matchMovieSearch } from '../utils/searchUtils';
 import {
   Film,
   Search,
@@ -29,13 +30,9 @@ export function Navbar({
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const searchRef = useRef(null);
 
-  // Lọc kết quả tìm kiếm tức thì
+  // Lọc kết quả tìm kiếm tức thì với hỗ trợ tiếng Việt có dấu/không dấu
   const filteredSuggestions = searchQuery.trim()
-    ? allMovies.filter(m =>
-        m.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        m.vietnameseTitle?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        m.director?.toLowerCase().includes(searchQuery.toLowerCase())
-      ).slice(0, 5)
+    ? allMovies.filter(m => matchMovieSearch(m, searchQuery)).slice(0, 5)
     : [];
 
   // Đóng dropdown khi click ra ngoài
@@ -82,7 +79,7 @@ export function Navbar({
             <Search size={17} className="nav-search-icon" />
             <input
               type="text"
-              placeholder="Tìm kiếm phim, đạo diễn hoặc tra cứu AI..."
+              placeholder="Tìm phim, đạo diễn, tra cứu AI..."
               value={searchQuery}
               onChange={(e) => {
                 onSearchChange(e.target.value);

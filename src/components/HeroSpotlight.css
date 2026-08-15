@@ -1,10 +1,10 @@
 .hero-spotlight-container {
   position: relative;
-  min-height: 560px;
+  min-height: 440px;
   display: flex;
   align-items: flex-end;
-  padding-bottom: 40px;
-  padding-top: 100px;
+  padding-bottom: 20px;
+  padding-top: 75px;
   overflow: hidden;
 }
 
@@ -44,14 +44,14 @@
   max-width: 780px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 8px;
 }
 
 .hero-tag-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .spotlight-tag {
@@ -61,9 +61,9 @@
   background: rgba(99, 102, 241, 0.2);
   color: #a5b4fc;
   border: 1px solid rgba(99, 102, 241, 0.4);
-  padding: 4px 10px;
+  padding: 3px 8px;
   border-radius: var(--radius-full);
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -74,7 +74,7 @@
 }
 
 .hero-main-title {
-  font-size: clamp(2rem, 4.5vw, 3.4rem);
+  font-size: clamp(1.75rem, 3.5vw, 2.6rem);
   font-weight: 900;
   line-height: 1.1;
   letter-spacing: -0.03em;
@@ -83,18 +83,18 @@
 }
 
 .hero-sub-title {
-  font-size: 1.2rem;
+  font-size: 1rem;
   font-weight: 600;
   color: var(--text-secondary);
-  margin-top: -6px;
+  margin-top: -4px;
 }
 
 .hero-meta-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  font-size: 0.85rem;
+  gap: 6px;
+  font-size: 0.8rem;
   color: var(--text-muted);
 }
 
@@ -109,28 +109,54 @@
 }
 
 .hero-synopsis {
-  font-size: 0.95rem;
-  line-height: 1.6;
+  font-size: 0.88rem;
+  line-height: 1.48;
   color: #cbd5e1;
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   max-width: 680px;
 }
 
-/* SCORES */
+/* SCORES: 1/3 UNIFIED SCORE, 2/3 FOR 4 SOURCE BADGES (2x2 GRID) */
 .hero-scores-cluster {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 14px;
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  align-items: stretch;
+  gap: 10px;
   margin: 6px 0;
+  width: 100%;
+  max-width: 680px;
+}
+
+.hero-scores-cluster .score-badge-unified {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 10px 14px;
 }
 
 .hero-source-badges {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+}
+
+.hero-source-badges .score-badge {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
+  padding: 6px 12px;
   gap: 8px;
 }
 
@@ -138,8 +164,8 @@
 .hero-cta-group {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 8px;
+  gap: 10px;
+  margin-top: 4px;
 }
 
 .hero-btn {
@@ -151,6 +177,14 @@
   font-weight: 700;
   font-size: 0.9rem;
   transition: all var(--transition-fast);
+}
+
+.hero-btn-text-short {
+  display: none;
+}
+
+.hero-btn-text-full {
+  display: inline;
 }
 
 .hero-btn-primary {
@@ -239,10 +273,344 @@
 @media (max-width: 900px) {
   .hero-content-wrapper {
     flex-direction: column;
-    align-items: flex-start;
-    gap: 20px;
+    align-items: stretch;
+    gap: 16px;
   }
   .hero-slide-nav {
     align-self: flex-end;
   }
 }
+
+@media (max-width: 768px) {
+  .hero-spotlight-container {
+    min-height: auto;
+    padding-top: 56px;
+    padding-bottom: 6px;
+  }
+
+  .hero-content-wrapper {
+    gap: 6px;
+  }
+
+  .hero-content-left {
+    max-width: 100%;
+    gap: 4px;
+  }
+
+  .hero-tag-row {
+    gap: 4px;
+  }
+
+  .spotlight-tag {
+    padding: 2px 7px;
+    font-size: 0.72rem;
+  }
+
+  .spotlight-tag .sparkle-icon {
+    width: 12px;
+    height: 12px;
+  }
+
+  .badge {
+    padding: 2px 7px;
+    font-size: 0.72rem;
+  }
+
+  .hero-main-title {
+    font-size: 1.25rem;
+    line-height: 1.15;
+    font-weight: 700;
+  }
+
+  .hero-sub-title {
+    font-size: 0.82rem;
+    margin-top: -3px;
+  }
+
+  .hero-meta-row {
+    font-size: 0.75rem;
+    gap: 5px;
+    line-height: 1.25;
+  }
+
+  .hero-synopsis {
+    font-size: 0.8rem;
+    line-height: 1.45;
+    -webkit-line-clamp: 2;
+    margin-bottom: 0;
+  }
+
+  /* SCORES LAYOUT: 1/3 UNIFIED SCORE, 2/3 FOR 4 SOURCE BADGES (2x2 GRID) */
+  .hero-scores-cluster {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 6px;
+    width: 100%;
+    margin: 2px 0;
+    align-items: stretch;
+  }
+
+  .hero-scores-cluster .score-badge-unified {
+    width: 100%;
+    height: 100%;
+    padding: 3px 5px;
+    gap: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    border-radius: var(--radius-sm);
+  }
+
+  .hero-scores-cluster .score-badge-unified .unified-ring {
+    width: 30px;
+    height: 30px;
+    flex-shrink: 0;
+  }
+
+  .hero-scores-cluster .score-badge-unified .unified-value .score-num {
+    font-size: 0.88rem;
+  }
+
+  .hero-scores-cluster .score-badge-unified .unified-value .score-max {
+    font-size: 0.46rem;
+  }
+
+  .hero-scores-cluster .score-badge-unified .unified-title {
+    font-size: 0.62rem;
+    font-weight: 800;
+  }
+
+  .hero-scores-cluster .score-badge-unified .unified-sub {
+    font-size: 0.48rem;
+  }
+
+  .hero-source-badges {
+    width: 100%;
+    height: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 4px;
+    box-sizing: border-box;
+  }
+
+  .hero-source-badges .score-badge {
+    padding: 2px 5px;
+    gap: 4px;
+    font-size: 0.68rem;
+    height: 100%;
+    min-height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    border-radius: var(--radius-xs);
+    box-sizing: border-box;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .hero-source-badges .score-desc-tag {
+    font-size: 0.52rem;
+    line-height: 1;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .hero-source-badges .imdb-icon {
+    font-size: 0.52rem;
+    padding: 1px 2px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  .hero-source-badges .score-badge-imdb .score-content {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+  }
+
+  .hero-source-badges .score-badge-imdb .score-main-row {
+    display: flex;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .hero-source-badges .source-emoji {
+    font-size: 0.78rem;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+
+  .hero-source-badges .mc-box {
+    width: 16px;
+    height: 16px;
+    font-size: 0.58rem;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  .hero-source-badges .score-content {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+    overflow: hidden;
+    line-height: 1.05;
+  }
+
+  .hero-source-badges .source-name {
+    font-size: 0.5rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1;
+    margin-bottom: 0;
+  }
+
+  .hero-source-badges .score-main {
+    font-size: 0.68rem;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .hero-source-badges .star-icon {
+    font-size: 0.65rem;
+  }
+
+  .hero-source-badges .score-sub {
+    font-size: 0.48rem;
+  }
+
+  .hero-btn-text-full {
+    display: none;
+  }
+
+  .hero-btn-text-short {
+    display: inline;
+  }
+
+  /* LUÔN HIỂN THỊ 3 NÚT TRÊN 1 HÀNG NGANG DUY NHẤT */
+  .hero-cta-group {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+    gap: 4px;
+    width: 100%;
+    margin-top: 2px;
+  }
+
+  .hero-btn {
+    padding: 5px 2px;
+    font-size: 0.7rem;
+    gap: 4px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    justify-content: center;
+    white-space: nowrap;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .hero-btn svg {
+    width: 13px;
+    height: 13px;
+    flex-shrink: 0;
+  }
+
+  .hero-slide-nav {
+    align-self: center;
+    padding: 2px 6px;
+    gap: 6px;
+    margin-top: 0;
+  }
+
+  .slide-arrow-btn svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .slide-dot {
+    width: 5px;
+    height: 5px;
+  }
+
+  .slide-dot.active {
+    width: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero-main-title {
+    font-size: 1.12rem;
+  }
+
+  .hero-scores-cluster {
+    gap: 4px;
+  }
+
+  .hero-scores-cluster .score-badge-unified {
+    padding: 2px 4px;
+    gap: 4px;
+  }
+
+  .hero-scores-cluster .score-badge-unified .unified-ring {
+    width: 28px;
+    height: 28px;
+  }
+
+  .hero-scores-cluster .score-badge-unified .unified-value .score-num {
+    font-size: 0.84rem;
+  }
+
+  .hero-scores-cluster .score-badge-unified .unified-title {
+    font-size: 0.58rem;
+  }
+
+  .hero-scores-cluster .score-badge-unified .unified-sub {
+    font-size: 0.44rem;
+  }
+
+  .hero-source-badges {
+    gap: 2px;
+  }
+
+  .hero-source-badges .score-badge {
+    padding: 1px 3px;
+    gap: 2px;
+  }
+
+  .hero-source-badges .source-name {
+    font-size: 0.46rem;
+  }
+
+  .hero-source-badges .score-main {
+    font-size: 0.64rem;
+  }
+
+  .hero-cta-group {
+    gap: 3px;
+  }
+
+  .hero-btn {
+    padding: 4px 1px;
+    font-size: 0.66rem;
+    gap: 2px;
+    height: 26px;
+  }
+
+  .hero-btn svg {
+    width: 12px;
+    height: 12px;
+  }
+}
+
+
+

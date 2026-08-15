@@ -65,11 +65,10 @@
 }
 
 .floating-unified-score .score-label {
-  font-size: 0.55rem;
+  font-size: 0.65rem;
   font-weight: 700;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  letter-spacing: 0.03em;
 }
 
 .floating-category-badge {
@@ -146,12 +145,12 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.75rem;
-  color: var(--text-muted);
+  font-size: 0.78rem;
+  color: var(--text-secondary);
 }
 
 .meta-dot {
-  opacity: 0.4;
+  opacity: 0.5;
 }
 
 .vietnam-tag {
@@ -167,11 +166,11 @@
   -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  line-height: 1.3;
+  line-height: 1.35;
 }
 
 .card-sub-title {
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 500;
   color: var(--text-muted);
   display: -webkit-box;
@@ -188,10 +187,10 @@
 }
 
 .genre-pill {
-  font-size: 0.65rem;
+  font-size: 0.72rem;
   color: var(--text-secondary);
-  background: rgba(255, 255, 255, 0.05);
-  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 2px 7px;
   border-radius: 4px;
 }
 
@@ -216,18 +215,229 @@
 }
 
 .mini-source-name {
-  font-size: 0.65rem;
+  font-size: 0.72rem;
   font-weight: 700;
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 .mini-source-name.imdb { color: var(--imdb-gold); }
 .mini-source-name.rt { color: var(--rt-critic); }
 .mini-source-name.mc { color: var(--mc-green); }
 
+.card-inline-badge {
+  display: none;
+}
+
+.card-quick-bookmark {
+  display: none;
+}
+
 .mini-score-val {
   font-family: var(--font-display);
-  font-size: 0.8rem;
-  font-weight: 800;
+  font-size: 0.85rem;
+  font-weight: 700;
   color: var(--text-primary);
+}
+
+/* =========================================================
+   MOBILE HORIZONTAL MOVIE CARD (BANNER NGANG)
+   ========================================================= */
+@media (max-width: 768px) {
+  .movie-card {
+    flex-direction: row;
+    align-items: stretch;
+    height: 130px;
+    min-height: 130px;
+    max-height: 130px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-subtle);
+  }
+
+  .movie-card:hover {
+    transform: none;
+  }
+
+  .card-media {
+    width: 92px;
+    min-width: 92px;
+    max-width: 92px;
+    height: 100%;
+    aspect-ratio: auto;
+    flex-shrink: 0;
+  }
+
+  .card-poster {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .desktop-only-badge {
+    display: none;
+  }
+
+  .floating-unified-score {
+    top: 6px;
+    right: 6px;
+    padding: 2px 5px;
+    border-radius: 4px;
+    background: rgba(13, 16, 25, 0.9);
+  }
+
+  .floating-unified-score .score-number {
+    font-size: 0.88rem;
+  }
+
+  .floating-unified-score .score-label {
+    font-size: 0.45rem;
+  }
+
+  .card-hover-actions {
+    display: none;
+  }
+
+  .card-content {
+    padding: 8px 10px 8px 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    flex: 1 1 auto;
+    min-width: 0;
+    gap: 2px;
+    background: var(--bg-card);
+  }
+
+  .card-meta-top {
+    font-size: 0.72rem;
+    gap: 5px;
+    align-items: center;
+  }
+
+  .card-inline-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+
+  .card-inline-badge.badge-masterpiece { background: rgba(234, 179, 8, 0.18); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.35); }
+  .card-inline-badge.badge-critic-darling { background: rgba(59, 130, 246, 0.18); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.35); }
+  .card-inline-badge.badge-audience-fav { background: rgba(239, 68, 68, 0.18); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.35); }
+  .card-inline-badge.badge-polarizing { background: rgba(168, 85, 247, 0.18); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.35); }
+  .card-inline-badge.badge-hidden-gem { background: rgba(20, 184, 166, 0.18); color: #2dd4bf; border: 1px solid rgba(20, 184, 166, 0.35); }
+  .card-inline-badge.badge-guilty-pleasure { background: rgba(249, 115, 22, 0.18); color: #fb923c; border: 1px solid rgba(249, 115, 22, 0.35); }
+
+  .card-meta-top {
+    font-size: 0.72rem;
+    gap: 4px;
+  }
+
+  .card-quick-bookmark {
+    display: inline-flex;
+    margin-left: auto;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    color: var(--text-muted);
+    background: rgba(255, 255, 255, 0.06);
+    transition: all var(--transition-fast);
+    flex-shrink: 0;
+  }
+
+  .card-quick-bookmark:hover,
+  .card-quick-bookmark.active {
+    color: var(--imdb-gold);
+    background: var(--imdb-bg);
+  }
+
+  .card-title-wrap {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .card-title {
+    font-size: 0.92rem;
+    font-weight: 700;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .card-sub-title {
+    font-size: 0.74rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: -1px;
+  }
+
+  .card-genres {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    margin-top: 1px;
+  }
+
+  .genre-pill {
+    font-size: 0.65rem;
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+
+  .card-score-strip {
+    margin-top: auto;
+    padding-top: 4px;
+    gap: 4px;
+  }
+
+  .source-mini-item {
+    flex-direction: row;
+    justify-content: center;
+    padding: 2px 4px;
+    gap: 3px;
+    border-radius: 4px;
+  }
+
+  .mini-source-name {
+    font-size: 0.65rem;
+  }
+
+  .mini-score-val {
+    font-size: 0.75rem;
+  }
+}
+
+@media (max-width: 400px) {
+  .movie-card {
+    height: 122px;
+    min-height: 122px;
+    max-height: 122px;
+  }
+
+  .card-media {
+    width: 82px;
+    min-width: 82px;
+    max-width: 82px;
+  }
+
+  .card-content {
+    padding: 6px 8px;
+  }
+
+  .card-title {
+    font-size: 0.88rem;
+  }
+
+  .card-sub-title {
+    font-size: 0.7rem;
+  }
 }

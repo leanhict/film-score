@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { calculateUnifiedScore, getMovieBadge } from '../services/scoreEngine';
 import { ScoreBadge } from './ScoreBadge';
 import { Play, Info, Bookmark, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
@@ -14,9 +14,20 @@ export function HeroSpotlight({
 }) {
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  // Lọc ra top phim nổi bật cho Hero
-  const spotlightList = movies.slice(0, 5);
-  const currentMovie = spotlightList[currentIndex] || movies[0];
+  // Chỉ lọc hiển thị các phim có điểm số IMDb trên 6.5 cho Hero Banner
+  const spotlightList = useMemo(() => {
+    const qualified = (movies || []).filter(m => (m.ratings?.imdb || 0) > 6.5);
+    return (qualified.length > 0 ? qualified : (movies || []).filter(m => (m.ratings?.imdb || 0) >= 6.0)).slice(0, 5);
+  }, [movies]);
+
+  // Đảm bảo currentIndex luôn hợp lệ khi danh sách thay đổi
+  useEffect(() => {
+    if (currentIndex >= spotlightList.length) {
+      setCurrentIndex(0);
+    }
+  }, [spotlightList.length, currentIndex]);
+
+  const currentMovie = spotlightList[currentIndex] || spotlightList[0] || null;
 
   // Auto slide mỗi 8s nếu người dùng không tương tác
   useEffect(() => {
@@ -101,10 +112,10 @@ export function HeroSpotlight({
             <ScoreBadge type="unified" score={unifiedScore} size="large" />
 
             <div className="hero-source-badges">
-              <ScoreBadge type="imdb" score={currentMovie.ratings?.imdb} votes={currentMovie.ratings?.imdbVotes} />
-              <ScoreBadge type="rtCritics" score={currentMovie.ratings?.rtCritics} />
-              <ScoreBadge type="rtAudience" score={currentMovie.ratings?.rtAudience} />
-              <ScoreBadge type="metacritic" score={currentMovie.ratings?.metascore} />
+              <ScoreBadge type="imdb" score={currentMovie.ratings?.imdb} votes={currentMovie.ratings?.imdbVotes} showSubtitle={true} />
+              <ScoreBadge type="rtCritics" score={currentMovie.ratings?.rtCritics} showSubtitle={true} />
+              <ScoreBadge type="rtAudience" score={currentMovie.ratings?.rtAudience} showSubtitle={true} />
+              <ScoreBadge type="metacritic" score={currentMovie.ratings?.metascore} showSubtitle={true} />
             </div>
           </div>
 
@@ -114,24 +125,32 @@ export function HeroSpotlight({
               <button
                 className="hero-btn hero-btn-primary"
                 onClick={() => onOpenTrailer && onOpenTrailer(currentMovie)}
+                title="Xem trailer chính thức"
               >
-                <Play size={18} fill="currentColor" /> Xem Trailer
+                <Play size={16} fill="currentColor" />
+                <span className="hero-btn-text-full">Xem Trailer</span>
+                <span className="hero-btn-text-short">Trailer</span>
               </button>
             )}
 
             <button
               className="hero-btn hero-btn-secondary"
               onClick={() => onSelectMovie && onSelectMovie(currentMovie)}
+              title="Xem chi tiết & So sánh điểm số"
             >
-              <Info size={18} /> Chi Tiết & So Sánh
+              <Info size={16} />
+              <span className="hero-btn-text-full">Chi Tiết & So Sánh</span>
+              <span className="hero-btn-text-short">Chi Tiết</span>
             </button>
 
             <button
               className={`hero-btn hero-btn-bookmark ${isWatchlisted ? 'active' : ''}`}
               onClick={() => onToggleWatchlist && onToggleWatchlist(currentMovie)}
+              title={isWatchlisted ? 'Đã lưu vào danh sách xem' : 'Lưu vào danh sách muốn xem'}
             >
-              <Bookmark size={18} fill={isWatchlisted ? 'currentColor' : 'none'} />
-              {isWatchlisted ? 'Đã Lưu' : 'Lưu Danh Sách'}
+              <Bookmark size={16} fill={isWatchlisted ? 'currentColor' : 'none'} />
+              <span className="hero-btn-text-full">{isWatchlisted ? 'Đã Lưu' : 'Lưu Danh Sách'}</span>
+              <span className="hero-btn-text-short">{isWatchlisted ? 'Đã Lưu' : 'Lưu Phim'}</span>
             </button>
           </div>
         </div>

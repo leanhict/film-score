@@ -5,7 +5,7 @@ import './ScoreBadge.css';
 /**
  * Component hiển thị huy hiệu điểm số từng nguồn hoặc điểm tổng hợp Unified Score
  */
-export function ScoreBadge({ type, score, votes, size = 'medium' }) {
+export function ScoreBadge({ type, score, votes, size = 'medium', showSubtitle = false, subtitle }) {
   if (score === null || score === undefined) {
     return (
       <div className={`score-badge score-badge-${size} score-badge-empty`}>
@@ -48,14 +48,18 @@ export function ScoreBadge({ type, score, votes, size = 'medium' }) {
 
   // 2. HUY HIỆU IMDB
   if (type === 'imdb') {
+    const subText = subtitle || (showSubtitle ? 'Khán giả toàn cầu' : null);
     return (
-      <div className={`score-badge score-badge-imdb score-badge-${size}`} title={`IMDb Rating: ${score}/10 (${votes || 'Hàng trăm nghìn lượt bình chọn'})`}>
+      <div className={`score-badge score-badge-imdb score-badge-${size} ${subText ? 'has-subtitle' : ''}`} title={`IMDb Rating: ${score}/10 (${votes || 'Hàng trăm nghìn lượt bình chọn'})`}>
         <div className="source-icon imdb-icon">IMDb</div>
         <div className="score-content">
-          <span className="score-main">
-            <span className="star-icon">★</span> {score.toFixed(1)}
-          </span>
-          <span className="score-sub">/10</span>
+          <div className="score-main-row">
+            <span className="score-main">
+              <span className="star-icon">★</span> {score.toFixed(1)}
+            </span>
+            <span className="score-sub">/10</span>
+          </div>
+          {subText && <span className="score-desc-tag">{subText}</span>}
         </div>
       </div>
     );
@@ -64,14 +68,18 @@ export function ScoreBadge({ type, score, votes, size = 'medium' }) {
   // 3. HUY HIỆU ROTTEN TOMATOES (CRITICS TOMATOMETER)
   if (type === 'rtCritics') {
     const isFresh = score >= 60;
+    const subText = subtitle || (showSubtitle ? 'Phê bình chuyên môn' : null);
     return (
-      <div className={`score-badge score-badge-rt-critic score-badge-${size}`} title={`Rotten Tomatoes Tomatometer: ${score}% (Giới Phê Bình Chuyên Môn)`}>
+      <div className={`score-badge score-badge-rt-critic score-badge-${size} ${subText ? 'has-subtitle' : ''}`} title={`Rotten Tomatoes Tomatometer: ${score}% (Giới Phê Bình Chuyên Môn)`}>
         <span className="source-emoji" role="img" aria-label="Tomato">
           {isFresh ? '🍅' : '🟢'}
         </span>
         <div className="score-content">
-          <span className="source-name">Tomatometer</span>
-          <span className="score-main">{score}%</span>
+          <div className="score-main-row">
+            <span className="score-main">{score}%</span>
+            <span className="source-name">Tomatometer</span>
+          </div>
+          {subText && <span className="score-desc-tag">{subText}</span>}
         </div>
       </div>
     );
@@ -80,14 +88,18 @@ export function ScoreBadge({ type, score, votes, size = 'medium' }) {
   // 4. HUY HIỆU ROTTEN TOMATOES (AUDIENCE POPCORNMETER)
   if (type === 'rtAudience') {
     const isPopcorn = score >= 60;
+    const subText = subtitle || (showSubtitle ? 'Khán giả đại chúng' : null);
     return (
-      <div className={`score-badge score-badge-rt-audience score-badge-${size}`} title={`Rotten Tomatoes Popcornmeter: ${score}% (Khán Giả Đại Chúng)`}>
+      <div className={`score-badge score-badge-rt-audience score-badge-${size} ${subText ? 'has-subtitle' : ''}`} title={`Rotten Tomatoes Popcornmeter: ${score}% (Khán Giả Đại Chúng)`}>
         <span className="source-emoji" role="img" aria-label="Popcorn">
           {isPopcorn ? '🍿' : '🥤'}
         </span>
         <div className="score-content">
-          <span className="source-name">Khán giả RT</span>
-          <span className="score-main">{score}%</span>
+          <div className="score-main-row">
+            <span className="score-main">{score}%</span>
+            <span className="source-name">Popcornmeter</span>
+          </div>
+          {subText && <span className="score-desc-tag">{subText}</span>}
         </div>
       </div>
     );
@@ -95,16 +107,18 @@ export function ScoreBadge({ type, score, votes, size = 'medium' }) {
 
   // 5. HUY HIỆU METACRITIC (METASCORE)
   if (type === 'metacritic') {
-    let mcClass = 'mc-green';
-    if (score < 60) mcClass = 'mc-yellow';
-    if (score < 40) mcClass = 'mc-red';
+    const subText = subtitle || (showSubtitle ? 'Báo chí chuyên môn' : null);
 
     return (
-      <div className={`score-badge score-badge-metacritic score-badge-${size}`} title={`Metacritic Metascore: ${score}/100 (Trọng số phê bình báo chí uy tín)`}>
-        <div className={`mc-box ${mcClass}`}>{score}</div>
+      <div className={`score-badge score-badge-metacritic score-badge-${size} ${subText ? 'has-subtitle' : ''}`} title={`Metacritic Metascore: ${score}/100 (Trọng số phê bình báo chí uy tín)`}>
+        <div className="source-icon mc-icon">MC</div>
         <div className="score-content">
-          <span className="source-name">Metascore</span>
-          <span className="score-sub">/100</span>
+          <div className="score-main-row">
+            <span className="score-main">{score}</span>
+            <span className="score-sub">/100</span>
+            <span className="source-name">Metascore</span>
+          </div>
+          {subText && <span className="score-desc-tag">{subText}</span>}
         </div>
       </div>
     );

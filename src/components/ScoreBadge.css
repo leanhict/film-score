@@ -34,14 +34,34 @@
   border-color: var(--imdb-border);
 }
 
+.source-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
 .imdb-icon {
   background: var(--imdb-gold);
   color: #000;
   font-weight: 900;
   font-size: 0.7rem;
-  padding: 2px 4px;
+  padding: 2px 5px;
   border-radius: 3px;
   letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.mc-icon {
+  background: #1e293b;
+  color: #66cc33;
+  border: 1px solid rgba(102, 204, 51, 0.45);
+  font-weight: 900;
+  font-size: 0.7rem;
+  padding: 2px 5px;
+  border-radius: 3px;
+  letter-spacing: -0.02em;
+  line-height: 1;
 }
 
 .star-icon {
@@ -67,27 +87,39 @@
   border-color: rgba(102, 204, 51, 0.3);
 }
 
-.mc-box {
-  width: 24px;
-  height: 24px;
+.score-content {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   justify-content: center;
-  font-weight: 800;
-  font-size: 0.75rem;
-  border-radius: 4px;
-  color: #fff;
+  min-width: 0;
 }
 
-.mc-green { background: #66cc33; color: #000; }
-.mc-yellow { background: #ffcc33; color: #000; }
-.mc-red { background: #ff0000; }
+.score-main-row {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  line-height: 1.15;
+}
+
+.score-desc-tag {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  white-space: nowrap;
+  line-height: 1.1;
+  margin-top: 1px;
+}
+
+.score-badge.has-subtitle {
+  padding: 6px 12px;
+}
 
 .source-name {
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   color: var(--text-secondary);
-  display: block;
-  line-height: 1;
+  display: inline;
+  line-height: 1.1;
+  font-weight: 500;
 }
 
 .score-main {
@@ -97,13 +129,23 @@
 }
 
 .score-sub {
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   color: var(--text-muted);
 }
 
 .source-emoji {
   font-size: 1.15rem;
   line-height: 1;
+}
+
+.score-badge-large .imdb-icon,
+.score-badge-large .mc-icon {
+  font-size: 0.75rem;
+  padding: 3px 6px;
+}
+
+.score-badge-large .source-emoji {
+  font-size: 1.25rem;
 }
 
 /* UNIFIED SCORE RING */
@@ -167,7 +209,7 @@
 .unified-value .score-num {
   font-family: var(--font-display);
   font-size: 1.05rem;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--text-primary);
 }
 
@@ -176,27 +218,26 @@
 }
 
 .unified-value .score-max {
-  font-size: 0.55rem;
+  font-size: 0.6rem;
   color: var(--text-muted);
 }
 
 .unified-text {
   display: flex;
   flex-direction: column;
-  line-height: 1.2;
+  line-height: 1.25;
 }
 
 .unified-title {
   font-size: 0.85rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.03em;
   background: var(--grad-unified);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .unified-sub {
-  font-size: 0.7rem;
+  font-size: 0.74rem;
   color: var(--text-secondary);
 }

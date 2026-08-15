@@ -1,36 +1,37 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { MOCK_MOVIES } from './data/mockMovies';
 import { DEFAULT_WEIGHTS, calculateUnifiedScore, getMovieBadge } from './services/scoreEngine';
+import { matchMovieSearch } from './utils/searchUtils';
+import { fetchLiveNetflixCategory, NETFLIX_CATEGORIES } from './services/netflixCatalogService';
 import { Navbar } from './components/Navbar';
 import { HeroSpotlight } from './components/HeroSpotlight';
 import { FiltersBar } from './components/FiltersBar';
 import { MovieCard } from './components/MovieCard';
 import { MovieDetailModal } from './components/MovieDetailModal';
 import { TrailerModal } from './components/TrailerModal';
-import { AISearchSection } from './components/AISearchSection';
+import { AISearchModal } from './components/AISearchModal';
 import { WeightSettingsModal } from './components/WeightSettingsModal';
 import { WatchlistDrawer } from './components/WatchlistDrawer';
 import { RandomPickerModal } from './components/RandomPickerModal';
-import { Sparkles, Film, Award, TrendingUp, AlertTriangle, ShieldCheck, Heart } from 'lucide-react';
+import { Sparkles, Film, Award, TrendingUp, AlertTriangle, ShieldCheck, Heart, Loader2 } from 'lucide-react';
 import './App.css';
 
 export function App() {
   // 1. STATE QUẢN LÝ DỮ LIỆU
   const [movies, setMovies] = useState(() => {
     try {
-      const saved = localStorage.getItem('filmscore_custom_movies');
+      const saved = localStorage.getItem('filmscore_netflix_cat_netflix_trending');
       if (saved) {
         const parsed = JSON.parse(saved);
-        // Hợp nhất mock movies và custom movies do AI tìm kiếm
-        const ids = new Set(parsed.map(m => m.id));
-        const combined = [...parsed, ...MOCK_MOVIES.filter(m => !ids.has(m.id))];
-        return combined;
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
     } catch (e) {
       console.error(e);
     }
     return MOCK_MOVIES;
   });
+
+  const [isLoadingCategory, setIsLoadingCategory] = useState(false);
 
   const [weights, setWeights] = useState(() => {
     try {
@@ -50,14 +51,14 @@ export function App() {
     }
   });
 
-  // 2. STATE BỘ LỌC & TÌM KIẾM
+  // 2. STATE BỘ LỌC & TÌM KIẾM THEO NETFLIX
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeCategory, setActiveCategory] = useState('all');
+  const [activeCategory, setActiveCategory] = useState('netflix_trending');
   const [selectedGenre, setSelectedGenre] = useState('all');
   const [minScore, setMinScore] = useState(0);
   const [sortBy, setSortBy] = useState('unified_desc');
-  const [hasAIResult, setHasAIResult] = useState(false);
-  const [aiSearchTrigger, setAiSearchTrigger] = useState(null);
+  const [isAISearchModalOpen, setIsAISearchModalOpen] = useState(false);
+  const [aiModalQuery, setAiModalQuery] = useState('');
 
   // 3. STATE MODALS
   const [selectedDetailMovie, setSelectedDetailMovie] = useState(null);
@@ -65,6 +66,29 @@ export function App() {
   const [isRandomPickerOpen, setIsRandomPickerOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isWatchlistOpen, setIsWatchlistOpen] = useState(false);
+
+  // Tự động tải 20-30 phim thời gian thực cho danh mục Netflix được chọn
+  useEffect(() => {
+    let isMounted = true;
+    setIsLoadingCategory(true);
+
+    fetchLiveNetflixCategory(activeCategory)
+      .then(liveList => {
+        if (isMounted && Array.isArray(liveList) && liveList.length > 0) {
+          setMovies(liveList);
+        }
+      })
+      .catch(err => {
+        console.error('Lỗi khi tải danh mục Netflix:', err);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoadingCategory(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeCategory]);
 
   // Lưu weights vào LocalStorage khi thay đổi
   const handleUpdateWeights = (newWeights) => {
@@ -119,12 +143,12 @@ export function App() {
   // Đặt lại toàn bộ về trạng thái trang chủ mặc định
   const handleResetHome = () => {
     setSearchQuery('');
-    setActiveCategory('all');
+    setActiveCategory('netflix_trending');
     setSelectedGenre('all');
     setMinScore(0);
     setSortBy('unified_desc');
-    setHasAIResult(false);
-    setAiSearchTrigger(null);
+    setIsAISearchModalOpen(false);
+    setAiModalQuery('');
     setSelectedDetailMovie(null);
     setTrailerMovie(null);
     setIsRandomPickerOpen(false);
@@ -133,22 +157,14 @@ export function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Mở & KÍCH HOẠT CHẠY NGAY TRÌNH TRA CỨU AI TRÊN TRANG
+  // Mở trình tra cứu AI dạng Modal
   const handleOpenAISearch = (query = '') => {
     const clean = query.trim();
-    if (clean) {
-      setAiSearchTrigger({ query: clean, timestamp: Date.now() });
-      setHasAIResult(true);
-    }
-    setTimeout(() => {
-      const el = document.getElementById('ai-search-section');
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    }, 50);
+    setAiModalQuery(clean || searchQuery || '');
+    setIsAISearchModalOpen(true);
   };
 
-  // Danh sách thể loại tổng hợp từ tất cả các phim
+  // Danh sách thể loại tổng hợp từ tất cả các phim trong danh mục hiện tại
   const genres = useMemo(() => {
     const set = new Set();
     movies.forEach(m => {
@@ -161,16 +177,10 @@ export function App() {
   const filteredAndSortedMovies = useMemo(() => {
     return movies.filter(movie => {
       const score = calculateUnifiedScore(movie.ratings, weights);
-      const badge = getMovieBadge(movie.ratings);
 
-      // Tìm kiếm từ khóa (chỉ áp dụng lọc cục bộ nếu không chạy AI Search hoặc có phim trùng khớp)
-      if (!hasAIResult && !aiSearchTrigger && searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const matchTitle = movie.title?.toLowerCase().includes(q);
-        const matchViTitle = movie.vietnameseTitle?.toLowerCase().includes(q);
-        const matchDirector = movie.director?.toLowerCase().includes(q);
-        const matchCast = movie.cast?.some(actor => actor.toLowerCase().includes(q));
-        if (!matchTitle && !matchViTitle && !matchDirector && !matchCast) {
+      // Tìm kiếm từ khóa (Hỗ trợ tiếng Việt có dấu, không dấu, tên dịch chuẩn)
+      if (searchQuery.trim()) {
+        if (!matchMovieSearch(movie, searchQuery)) {
           return false;
         }
       }
@@ -185,29 +195,6 @@ export function App() {
         return false;
       }
 
-      // Lọc Phân loại (Category)
-      if (activeCategory === 'vietnam') {
-        return movie.country === 'Việt Nam';
-      }
-      if (activeCategory === 'masterpiece') {
-        return score >= 85 || badge?.key === 'masterpiece';
-      }
-      if (activeCategory === 'critic_darling') {
-        return badge?.key === 'critic_darling';
-      }
-      if (activeCategory === 'audience_favorite') {
-        return badge?.key === 'audience_favorite';
-      }
-      if (activeCategory === 'polarizing') {
-        return badge?.key === 'polarizing';
-      }
-      if (activeCategory === 'hidden_gem') {
-        return badge?.key === 'hidden_gem' || movie.id?.includes('gem') || movie.id?.includes('past-lives');
-      }
-      if (activeCategory === 'guilty_pleasure') {
-        return badge?.key === 'guilty_pleasure';
-      }
-
       return true;
     }).sort((a, b) => {
       const scoreA = calculateUnifiedScore(a.ratings, weights);
@@ -220,7 +207,7 @@ export function App() {
       if (sortBy === 'year_desc') return (b.year || 0) - (a.year || 0);
       return 0;
     });
-  }, [movies, searchQuery, activeCategory, selectedGenre, minScore, sortBy, weights, hasAIResult, aiSearchTrigger]);
+  }, [movies, searchQuery, selectedGenre, minScore, sortBy, weights]);
 
   return (
     <div className="film-score-app">
@@ -239,51 +226,19 @@ export function App() {
         onResetHome={handleResetHome}
       />
 
-      {/* HERO SPOTLIGHT: Tạm thời ẩn khi có kết quả tra cứu AI để tạo không gian thoáng đãng */}
-      {!hasAIResult && (
-        <HeroSpotlight
-          movies={movies}
-          weights={weights}
-          onSelectMovie={setSelectedDetailMovie}
-          onOpenTrailer={setTrailerMovie}
-          watchlist={watchlist}
-          onToggleWatchlist={handleToggleWatchlist}
-        />
-      )}
+      {/* HERO SPOTLIGHT */}
+      <HeroSpotlight
+        movies={movies}
+        weights={weights}
+        onSelectMovie={setSelectedDetailMovie}
+        onOpenTrailer={setTrailerMovie}
+        watchlist={watchlist}
+        onToggleWatchlist={handleToggleWatchlist}
+      />
 
       {/* MAIN CONTENT AREA */}
       <main className="container main-content">
-        {/* BANNER THÔNG TIN ĐIỂM SỐ CHUẨN HÓA: Ẩn khi đang có kết quả AI */}
-        {!hasAIResult && (
-          <div className="methodology-banner glass-panel">
-            <div className="methodology-item">
-              <span className="source-pill imdb-pill">★ IMDb</span>
-              <p>Thước đo phản ứng của <strong>cộng đồng khán giả toàn cầu</strong></p>
-            </div>
-            <div className="methodology-divider" />
-            <div className="methodology-item">
-              <span className="source-pill rt-pill">🍅 Rotten Tomatoes</span>
-              <p>Tỷ lệ đồng thuận từ <strong>giới phê bình & khán giả rạp</strong></p>
-            </div>
-            <div className="methodology-divider" />
-            <div className="methodology-item">
-              <span className="source-pill mc-pill">Ⓜ Metacritic</span>
-              <p>Trọng số học thuật từ <strong>các nhà phê bình báo chí uy tín nhất</strong></p>
-            </div>
-          </div>
-        )}
-
-        {/* KHU VỰC TRA CỨU AI ĐA NGUỒN TRỰC TIẾP TRÊN TRANG */}
-        <AISearchSection
-          searchQuery={searchQuery}
-          aiSearchTrigger={aiSearchTrigger}
-          onAddMovieToLibrary={handleAddMovieFromAI}
-          onOpenSettings={() => setIsSettingsOpen(true)}
-          onResultStateChange={setHasAIResult}
-          weights={weights}
-        />
-
-        {/* BỘ LỌC & TÌM KIẾM CỤC BỘ */}
+        {/* BỘ LỌC DANH MỤC NETFLIX THỜI GIAN THỰC */}
         <FiltersBar
           activeCategory={activeCategory}
           onSelectCategory={setActiveCategory}
@@ -295,16 +250,17 @@ export function App() {
           sortBy={sortBy}
           onSortChange={setSortBy}
           onResetFilters={() => {
-            setActiveCategory('all');
+            setActiveCategory('netflix_trending');
             setSelectedGenre('all');
             setMinScore(0);
             setSortBy('unified_desc');
             setSearchQuery('');
           }}
           totalResults={filteredAndSortedMovies.length}
+          isLoadingCategory={isLoadingCategory}
         />
 
-        {/* DANH SÁCH THẺ PHIM (GRID) */}
+        {/* DANH SÁCH THẺ PHIM NETFLIX REAL-TIME (GRID) */}
         {filteredAndSortedMovies.length > 0 ? (
           <div className="movies-grid">
             {filteredAndSortedMovies.map(movie => (
@@ -323,43 +279,40 @@ export function App() {
           /* TRƯỜNG HỢP BỘ LỌC KHÔNG CÓ PHIM PHÙ HỢP */
           <div className="empty-category-notice glass-panel animate-fade-in" style={{ textAlign: 'center', padding: '40px 20px', borderRadius: '12px', margin: '20px 0' }}>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
-              Không có tác phẩm nào phù hợp với bộ lọc đã chọn.
+              {isLoadingCategory ? 'Đang tải danh sách phim Netflix thời gian thực...' : 'Không có tác phẩm nào phù hợp với bộ lọc đã chọn.'}
             </p>
             <button
               onClick={() => {
-                setActiveCategory('all');
+                setActiveCategory('netflix_trending');
                 setSelectedGenre('all');
                 setMinScore(0);
                 setSearchQuery('');
               }}
               style={{ marginTop: '12px', padding: '8px 18px', background: 'rgba(255,255,255,0.08)', border: '1px solid var(--border-subtle)', borderRadius: '8px', color: '#fff', cursor: 'pointer', fontSize: '0.85rem' }}
             >
-              Đặt lại tất cả bộ lọc
+              Đặt lại bộ lọc mặc định
             </button>
           </div>
         )}
       </main>
 
       {/* FOOTER */}
-      <footer className="footer-container">
-        <div className="container footer-inner">
-          <div className="footer-brand-col">
+      <footer className="footer-section">
+        <div className="container footer-content">
+          <div className="footer-brand">
             <div className="footer-logo">
-              <Film size={20} className="footer-icon" />
-              <span>FilmScore Hub</span>
+              <span className="logo-gradient">FilmScore</span>
+              <span className="footer-tagline">Netflix Real-time Edition</span>
             </div>
-            <p className="footer-tagline">
-              Nền tảng đánh giá điện ảnh toàn diện tổng hợp điểm số từ IMDb, Rotten Tomatoes và Metacritic. Tích hợp công nghệ Gemini AI tra cứu thời gian thực.
+            <p className="footer-desc">
+              Hệ thống tổng hợp & đối chiếu điểm số điện ảnh đa nguồn thời gian thực từ IMDb, Rotten Tomatoes và Metacritic kết hợp danh mục Netflix Live.
             </p>
           </div>
-
-          <div className="footer-meta-col">
-            <div className="footer-badge">
-              <ShieldCheck size={16} /> 100% Giao diện & Dữ liệu Việt hóa
+          <div className="footer-links">
+            <div className="footer-credit">
+              Designed &amp; Developed by <span className="author-name">Lê Anh</span>
             </div>
-            <div className="footer-sources">
-              Dữ liệu đối chiếu từ: IMDb • Rotten Tomatoes • Metacritic • Google Gemini AI
-            </div>
+            <span className="footer-copy">© 2026 FilmScore Hub • Cập nhật dữ liệu thời gian thực.</span>
           </div>
         </div>
       </footer>
@@ -383,31 +336,49 @@ export function App() {
         />
       )}
 
-      <WeightSettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        weights={weights}
-        onUpdateWeights={handleUpdateWeights}
+      <AISearchModal
+        isOpen={isAISearchModalOpen}
+        onClose={() => setIsAISearchModalOpen(false)}
+        initialQuery={aiModalQuery}
+        onAddMovieToLibrary={handleAddMovieFromAI}
+        onOpenSettings={() => {
+          setIsAISearchModalOpen(false);
+          setIsSettingsOpen(true);
+        }}
       />
+
+      {isSettingsOpen && (
+        <WeightSettingsModal
+          weights={weights}
+          onSave={handleUpdateWeights}
+          onClose={() => setIsSettingsOpen(false)}
+        />
+      )}
 
       <WatchlistDrawer
         isOpen={isWatchlistOpen}
         onClose={() => setIsWatchlistOpen(false)}
         watchlist={watchlist}
         weights={weights}
+        onSelectMovie={(movie) => {
+          setIsWatchlistOpen(false);
+          setSelectedDetailMovie(movie);
+        }}
         onRemoveFromWatchlist={handleRemoveFromWatchlist}
-        onSelectMovie={setSelectedDetailMovie}
         onClearWatchlist={handleClearWatchlist}
       />
 
-      <RandomPickerModal
-        isOpen={isRandomPickerOpen}
-        onClose={() => setIsRandomPickerOpen(false)}
-        movies={movies}
-        weights={weights}
-        onSelectMovie={setSelectedDetailMovie}
-        onOpenTrailer={setTrailerMovie}
-      />
+      {isRandomPickerOpen && (
+        <RandomPickerModal
+          movies={filteredAndSortedMovies.length > 0 ? filteredAndSortedMovies : movies}
+          weights={weights}
+          onClose={() => setIsRandomPickerOpen(false)}
+          onSelectMovie={(movie) => {
+            setIsRandomPickerOpen(false);
+            setSelectedDetailMovie(movie);
+          }}
+        />
+      )}
     </div>
   );
 }
