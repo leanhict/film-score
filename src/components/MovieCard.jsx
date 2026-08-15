@@ -1,5 +1,6 @@
 import React from 'react';
 import { calculateUnifiedScore, getMovieBadge, getScoreColor } from '../services/scoreEngine';
+import { resolveMovieTitles } from '../utils/movieTitleResolver';
 import { Bookmark, Play, Eye, Star, Info } from 'lucide-react';
 import './MovieCard.css';
 
@@ -111,12 +112,19 @@ export function MovieCard({
         </div>
 
         <div className="card-title-wrap">
-          <h3 className="card-title" title={movie.vietnameseTitle || movie.title}>
-            {movie.vietnameseTitle || movie.title}
-          </h3>
-          {movie.vietnameseTitle && movie.vietnameseTitle !== movie.title && (
-            <h4 className="card-sub-title">{movie.title}</h4>
-          )}
+          {(() => {
+            const cardTitles = resolveMovieTitles(movie);
+            return (
+              <>
+                <h3 className="card-title" title={cardTitles.vietnameseTitle}>
+                  {cardTitles.vietnameseTitle}
+                </h3>
+                {cardTitles.englishTitle && cardTitles.englishTitle !== cardTitles.vietnameseTitle && (
+                  <h4 className="card-sub-title">{cardTitles.englishTitle}</h4>
+                )}
+              </>
+            );
+          })()}
         </div>
 
         {/* GENRE TAGS */}

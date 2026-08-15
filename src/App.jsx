@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { MOCK_MOVIES } from './data/mockMovies';
 import { DEFAULT_WEIGHTS, calculateUnifiedScore, getMovieBadge } from './services/scoreEngine';
-import { matchMovieSearch } from './utils/searchUtils';
+import { matchMovieSearch, parseYearToNumber } from './utils/searchUtils';
 import { fetchLiveNetflixCategory, NETFLIX_CATEGORIES } from './services/netflixCatalogService';
 import { Navbar } from './components/Navbar';
 import { HeroSpotlight } from './components/HeroSpotlight';
@@ -204,7 +204,7 @@ export function App() {
       if (sortBy === 'imdb_desc') return (b.ratings?.imdb || 0) - (a.ratings?.imdb || 0);
       if (sortBy === 'rt_desc') return (b.ratings?.rtCritics || 0) - (a.ratings?.rtCritics || 0);
       if (sortBy === 'metascore_desc') return (b.ratings?.metascore || 0) - (a.ratings?.metascore || 0);
-      if (sortBy === 'year_desc') return (b.year || 0) - (a.year || 0);
+      if (sortBy === 'year_desc') return parseYearToNumber(b.year) - parseYearToNumber(a.year);
       return 0;
     });
   }, [movies, searchQuery, selectedGenre, minScore, sortBy, weights]);
@@ -234,6 +234,8 @@ export function App() {
         onOpenTrailer={setTrailerMovie}
         watchlist={watchlist}
         onToggleWatchlist={handleToggleWatchlist}
+        activeCategory={activeCategory}
+        onSelectCategory={setActiveCategory}
       />
 
       {/* MAIN CONTENT AREA */}

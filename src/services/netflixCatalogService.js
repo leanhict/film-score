@@ -5,6 +5,8 @@
  */
 
 import { MOCK_MOVIES } from '../data/mockMovies.js';
+import { resolveMovieTitles } from '../utils/movieTitleResolver.js';
+import { formatQuickSynopsis } from '../utils/searchUtils.js';
 
 const TMDB_API_KEYS = [
   '4e44d9029b1270a757cddc766a1bcb63',
@@ -92,6 +94,7 @@ function mapTmdbToFilmScore(m) {
   else if (m.original_language === 'zh' || m.original_language === 'cn') country = 'Trung Quốc';
   else if (m.original_language === 'es') country = 'Tây Ban Nha';
   else if (m.original_language === 'de') country = 'Đức';
+  else if (m.original_language === 'th') country = 'Thái Lan';
   else if (m.original_language === 'en') country = 'Mỹ';
 
   const poster = m.poster_path
@@ -102,11 +105,20 @@ function mapTmdbToFilmScore(m) {
     ? `https://image.tmdb.org/t/p/w1280${m.backdrop_path}`
     : poster;
 
+  // Chuẩn hóa tên phim tiếng Việt chuẩn xác và tên tiếng Anh quốc tế
+  const { vietnameseTitle, englishTitle } = resolveMovieTitles({
+    title: m.title,
+    originalTitle: m.original_title,
+    original_title: m.original_title,
+    original_language: m.original_language
+  });
+
   return {
     id: `tmdb_${m.id}`,
-    title: m.original_title || m.title,
-    vietnameseTitle: m.title || m.original_title,
-    originalTitle: m.original_title || m.title,
+    title: englishTitle || m.title || m.original_title,
+    englishTitle: englishTitle || m.title || m.original_title,
+    vietnameseTitle: vietnameseTitle || m.title,
+    originalTitle: m.original_title || englishTitle,
     year: isNaN(year) ? 2024 : year,
     runtime: '115 phút',
     director: m.director || 'Đạo diễn Netflix',
@@ -123,7 +135,7 @@ function mapTmdbToFilmScore(m) {
       metascore: metascore,
       mcUser: Number((voteAvg * 0.95).toFixed(1))
     },
-    synopsis: m.overview || 'Tác phẩm điện ảnh đặc sắc đang có mặt trên nền tảng Netflix toàn cầu.',
+    synopsis: formatQuickSynopsis(m.overview || 'Tác phẩm điện ảnh đặc sắc đang có mặt trên nền tảng Netflix toàn cầu.', 60),
     detailedPlot: m.overview || '',
     awards: voteAvg >= 8.2 ? 'Top Tác phẩm xuất sắc Netflix' : null
   };
@@ -141,8 +153,8 @@ export async function fetchLiveNetflixCategory(categoryId = 'netflix_trending') 
     return memoryCache.get(categoryId);
   }
 
-  // 2. Kiểm tra LocalStorage
-  const localKey = `filmscore_netflix_cat_${categoryId}`;
+  // 2. Kiểm tra LocalStorage (dùng phiên bản v3 để nạp tiêu đề chuẩn hóa mới)
+  const localKey = `filmscore_netflix_cat_v3_${categoryId}`;
   try {
     const saved = localStorage.getItem(localKey);
     if (saved) {
@@ -244,7 +256,7 @@ async function fetchCategoryFromApi(categoryId) {
     if (list.length > 0) {
       memoryCache.set(categoryId, list);
       try {
-        localStorage.setItem(`filmscore_netflix_cat_${categoryId}`, JSON.stringify(list));
+        localStorage.setItem(`filmscore_netflix_cat_v3_${categoryId}`, JSON.stringify(list));
       } catch (e) {}
       return list;
     }

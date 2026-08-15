@@ -31,20 +31,6 @@ export function FiltersBar({
 
   return (
     <div className="filters-bar-container">
-      {/* CATEGORY PILLS SCROLLABLE (NETFLIX CATEGORIES) */}
-      <div className="category-pills-row">
-        {NETFLIX_CATEGORIES.map(cat => (
-          <button
-            key={cat.id}
-            className={`cat-pill-btn ${activeCategory === cat.id ? 'active' : ''}`}
-            onClick={() => onSelectCategory(cat.id)}
-          >
-            <span className="cat-icon">{cat.icon}</span>
-            <span>{cat.label}</span>
-          </button>
-        ))}
-      </div>
-
       {/* SECONDARY FILTER CONTROLS */}
       <div className="filter-controls-row">
         <div className="results-count-wrap">

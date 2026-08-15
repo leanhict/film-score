@@ -24,10 +24,12 @@ const SPEED_OPTIONS = [
 
 export function AudioPlotReader({
   text = '',
-  title = 'Tóm Tắt Cốt Truyện & Diễn Biến',
-  spoilerTag = 'Spoiler • Tiết lộ nội dung',
-  className = ''
+  title = 'Tóm tắt diễn biến',
+  spoilerTag = 'Spoiler',
+  className = '',
+  defaultExpanded = false
 }) {
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [currentSentenceIndex, setCurrentSentenceIndex] = useState(-1);
@@ -361,6 +363,7 @@ export function AudioPlotReader({
   // Bắt đầu đọc
   const handleStartPlay = () => {
     if (sentences.length === 0) return;
+    setIsExpanded(true);
     const startIndex = currentSentenceIndex >= 0 ? currentSentenceIndex : 0;
     runSpeechQueue(startIndex);
   };
@@ -473,185 +476,34 @@ export function AudioPlotReader({
   if (!text) return null;
 
   return (
-    <div className={`audio-plot-card ${isPlaying ? 'is-speaking' : ''} ${className}`}>
-      {/* HEADER */}
+    <div className={`audio-plot-card ${isPlaying ? 'is-speaking' : ''} ${isExpanded ? 'is-expanded' : 'is-collapsed'} ${className}`}>
+      {/* HEADER: Tiêu đề ở góc trái, Nút Mở rộng/Thu nhỏ ở góc phải */}
       <div className="audio-plot-header">
-        <div className="audio-plot-title-wrap">
+        <div
+          className="audio-plot-title-wrap"
+          onClick={() => setIsExpanded(prev => !prev)}
+          title={isExpanded ? 'Bấm để thu nhỏ' : 'Bấm để mở rộng tóm tắt diễn biến'}
+          role="button"
+          tabIndex={0}
+        >
           <BookOpen size={16} className="audio-plot-book-icon" />
           <span className="audio-plot-title">{title}</span>
-        </div>
-
-        <div className="audio-plot-header-actions">
           {spoilerTag && (
             <span className="audio-plot-spoiler-tag">{spoilerTag}</span>
           )}
-
-          {/* AUDIO CONTROLS CLUSTER */}
-          <div className="audio-controls-group">
-            {/* NÚT PHÁT / TẠM DỪNG */}
-            {!isPlaying ? (
-              <button
-                type="button"
-                className="audio-btn audio-btn-play"
-                onClick={handleStartPlay}
-                title="Nghe đọc tóm tắt cốt truyện bằng giọng nói AI Tiếng Việt"
-              >
-                <Volume2 size={15} />
-                <span>Nghe Đọc</span>
-              </button>
-            ) : isPaused ? (
-              <button
-                type="button"
-                className="audio-btn audio-btn-resume"
-                onClick={handleResume}
-                title="Tiếp tục đọc"
-              >
-                <Play size={14} fill="currentColor" />
-                <span>Tiếp tục</span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="audio-btn audio-btn-pause"
-                onClick={handlePause}
-                title="Tạm dừng đọc"
-              >
-                <Pause size={14} fill="currentColor" />
-                <span>Tạm dừng</span>
-              </button>
-            )}
-
-            {/* NÚT DỪNG */}
-            {isPlaying && (
-              <button
-                type="button"
-                className="audio-btn audio-btn-stop"
-                onClick={stopSpeech}
-                title="Dừng đọc"
-              >
-                <Square size={13} fill="currentColor" />
-              </button>
-            )}
-
-            {/* EQUALIZER WAVE ANIMATION */}
-            {isPlaying && !isPaused && (
-              <div className="audio-soundwave" title="Đang phát giọng đọc">
-                <span className="bar bar-1" />
-                <span className="bar bar-2" />
-                <span className="bar bar-3" />
-                <span className="bar bar-4" />
-              </div>
-            )}
-
-            {/* CHỌN GIỌNG ĐỌC */}
-            <div className="audio-dropdown-wrap">
-              <button
-                type="button"
-                className={`audio-btn audio-btn-voice ${showVoiceMenu ? 'active' : ''}`}
-                onClick={() => {
-                  setShowVoiceMenu(prev => !prev);
-                  setShowSpeedMenu(false);
-                }}
-                title={`Giọng đọc: ${currentVoiceDisplayName}`}
-              >
-                <Sparkles size={13} className="voice-sparkle-icon" />
-                <span className="voice-label-truncate">{currentVoiceDisplayName}</span>
-                <ChevronDown size={11} />
-              </button>
-
-              {showVoiceMenu && (
-                <div className="audio-dropdown-menu voice-dropdown-menu">
-                  <div className="audio-dropdown-header">Giọng Đọc Trực Tuyến AI (Khuyên dùng):</div>
-                  
-                  <button
-                    type="button"
-                    className={`audio-dropdown-item ${selectedVoiceId === 'google-ai-vi' ? 'selected' : ''}`}
-                    onClick={() => handleSelectVoice('google-ai-vi')}
-                  >
-                    <div className="item-main-info">
-                      <span className="item-label">
-                        🌟 Google AI Tiếng Việt (Nữ - Tự nhiên)
-                      </span>
-                      <span className="item-sub">Âm thanh chuẩn, rõ chữ, hoạt động 100% trên mọi thiết bị</span>
-                    </div>
-                    {selectedVoiceId === 'google-ai-vi' && <Check size={14} className="check-icon" />}
-                  </button>
-
-                  {/* GIỌNG ĐỌC HỆ THỐNG / WINDOWS NẾU CÓ */}
-                  <div className="audio-dropdown-header mt-header">
-                    Giọng Hệ Thống Cục Bộ ({systemVoices.length}):
-                  </div>
-
-                  {systemVoices.length > 0 ? (
-                    systemVoices.map(v => (
-                      <button
-                        key={v.voiceURI}
-                        type="button"
-                        className={`audio-dropdown-item ${selectedVoiceId === v.voiceURI ? 'selected' : ''}`}
-                        onClick={() => handleSelectVoice(v.voiceURI)}
-                      >
-                        <div className="item-main-info">
-                          <span className="item-label">💻 {v.name.replace(/Online \(Natural\)/gi, '').trim()}</span>
-                          <span className="item-sub">{v.lang} (Hệ thống)</span>
-                        </div>
-                        {selectedVoiceId === v.voiceURI && <Check size={14} className="check-icon" />}
-                      </button>
-                    ))
-                  ) : (
-                    <div className="no-system-voice-note">
-                      <span>Chưa phát hiện giọng Tiếng Việt cài sẵn trên Windows/trình duyệt.</span>
-                      <button
-                        type="button"
-                        className="btn-open-guide-link"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setShowVoiceMenu(false);
-                          setShowWindowsHelp(true);
-                        }}
-                      >
-                        <HelpCircle size={12} /> Hướng dẫn cài thêm vào Windows
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* TỐC ĐỘ ĐỌC DROPDOWN */}
-            <div className="audio-dropdown-wrap">
-              <button
-                type="button"
-                className={`audio-btn audio-btn-speed ${showSpeedMenu ? 'active' : ''}`}
-                onClick={() => {
-                  setShowSpeedMenu(prev => !prev);
-                  setShowVoiceMenu(false);
-                }}
-                title="Thay đổi tốc độ đọc"
-              >
-                <Gauge size={13} />
-                <span>{speechRate}x</span>
-                <ChevronDown size={11} />
-              </button>
-
-              {showSpeedMenu && (
-                <div className="audio-dropdown-menu speed-dropdown-menu">
-                  <div className="audio-dropdown-header">Tốc độ đọc:</div>
-                  {SPEED_OPTIONS.map(opt => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      className={`audio-dropdown-item ${speechRate === opt.value ? 'selected' : ''}`}
-                      onClick={() => handleChangeSpeed(opt.value)}
-                    >
-                      <span className="item-label">{opt.label}</span>
-                      <span className="item-desc">{opt.desc}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
         </div>
+
+        {/* NÚT THU NHỎ / MỞ RỘNG Ở GÓC PHẢI CÙNG HÀNG */}
+        <button
+          type="button"
+          className={`audio-btn audio-btn-toggle-expand ${isExpanded ? 'active' : ''}`}
+          onClick={() => setIsExpanded(prev => !prev)}
+          title={isExpanded ? 'Thu nhỏ tóm tắt diễn biến' : 'Mở rộng tóm tắt diễn biến'}
+          aria-expanded={isExpanded}
+        >
+          <ChevronDown size={13} className={`expand-chevron ${isExpanded ? 'is-expanded' : ''}`} />
+          <span>{isExpanded ? 'Thu nhỏ' : 'Mở rộng'}</span>
+        </button>
       </div>
 
       {/* ERROR MESSAGE NOTIFICATION */}
@@ -663,43 +515,216 @@ export function AudioPlotReader({
         </div>
       )}
 
-      {/* LIVE PROGRESS BAR KHI ĐANG ĐỌC */}
-      {isPlaying && (
-        <div className="audio-progress-track">
-          <div
-            className="audio-progress-bar"
-            style={{ width: `${progressPercent}%` }}
-          />
-          <div className="audio-progress-info">
-            <span>Đang đọc: Câu {currentSentenceIndex + 1}/{sentences.length} • Giọng: {currentVoiceDisplayName}</span>
-            <span>{progressPercent}%</span>
+      {/* NỘI DUNG VÀ PHẦN ĐỌC VĂN BẢN (CHỈ HIỆN KHI MỞ RỘNG) */}
+      {(isExpanded || isPlaying) && (
+        <div className="audio-plot-body-wrap">
+          {/* THANH ĐIỀU KHIỂN GIỌNG ĐỌC AI */}
+          <div className="audio-controls-toolbar">
+            <div className="audio-controls-group">
+              {/* NÚT PHÁT / TẠM DỪNG */}
+              {!isPlaying ? (
+                <button
+                  type="button"
+                  className="audio-btn audio-btn-play"
+                  onClick={handleStartPlay}
+                  title="Nghe đọc tóm tắt cốt truyện bằng giọng nói AI Tiếng Việt"
+                >
+                  <Volume2 size={15} />
+                  <span>Nghe Đọc</span>
+                </button>
+              ) : isPaused ? (
+                <button
+                  type="button"
+                  className="audio-btn audio-btn-resume"
+                  onClick={handleResume}
+                  title="Tiếp tục đọc"
+                >
+                  <Play size={14} fill="currentColor" />
+                  <span>Tiếp tục</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="audio-btn audio-btn-pause"
+                  onClick={handlePause}
+                  title="Tạm dừng đọc"
+                >
+                  <Pause size={14} fill="currentColor" />
+                  <span>Tạm dừng</span>
+                </button>
+              )}
+
+              {/* NÚT DỪNG */}
+              {isPlaying && (
+                <button
+                  type="button"
+                  className="audio-btn audio-btn-stop"
+                  onClick={stopSpeech}
+                  title="Dừng đọc"
+                >
+                  <Square size={13} fill="currentColor" />
+                </button>
+              )}
+
+              {/* EQUALIZER WAVE ANIMATION */}
+              {isPlaying && !isPaused && (
+                <div className="audio-soundwave" title="Đang phát giọng đọc">
+                  <span className="bar bar-1" />
+                  <span className="bar bar-2" />
+                  <span className="bar bar-3" />
+                  <span className="bar bar-4" />
+                </div>
+              )}
+
+              {/* CHỌN GIỌNG ĐỌC */}
+              <div className="audio-dropdown-wrap">
+                <button
+                  type="button"
+                  className={`audio-btn audio-btn-voice ${showVoiceMenu ? 'active' : ''}`}
+                  onClick={() => {
+                    setShowVoiceMenu(prev => !prev);
+                    setShowSpeedMenu(false);
+                  }}
+                  title={`Giọng đọc: ${currentVoiceDisplayName}`}
+                >
+                  <Sparkles size={13} className="voice-sparkle-icon" />
+                  <span className="voice-label-truncate">{currentVoiceDisplayName}</span>
+                  <ChevronDown size={11} />
+                </button>
+
+                {showVoiceMenu && (
+                  <div className="audio-dropdown-menu voice-dropdown-menu">
+                    <div className="audio-dropdown-header">Giọng Đọc Trực Tuyến AI (Khuyên dùng):</div>
+                    
+                    <button
+                      type="button"
+                      className={`audio-dropdown-item ${selectedVoiceId === 'google-ai-vi' ? 'selected' : ''}`}
+                      onClick={() => handleSelectVoice('google-ai-vi')}
+                    >
+                      <div className="item-main-info">
+                        <span className="item-label">
+                          🌟 Google AI Tiếng Việt (Nữ - Tự nhiên)
+                        </span>
+                        <span className="item-sub">Âm thanh chuẩn, rõ chữ, hoạt động 100% trên mọi thiết bị</span>
+                      </div>
+                      {selectedVoiceId === 'google-ai-vi' && <Check size={14} className="check-icon" />}
+                    </button>
+
+                    {/* GIỌNG ĐỌC HỆ THỐNG / WINDOWS NẾU CÓ */}
+                    <div className="audio-dropdown-header mt-header">
+                      Giọng Hệ Thống Cục Bộ ({systemVoices.length}):
+                    </div>
+
+                    {systemVoices.length > 0 ? (
+                      systemVoices.map(v => (
+                        <button
+                          key={v.voiceURI}
+                          type="button"
+                          className={`audio-dropdown-item ${selectedVoiceId === v.voiceURI ? 'selected' : ''}`}
+                          onClick={() => handleSelectVoice(v.voiceURI)}
+                        >
+                          <div className="item-main-info">
+                            <span className="item-label">💻 {v.name.replace(/Online \(Natural\)/gi, '').trim()}</span>
+                            <span className="item-sub">{v.lang} (Hệ thống)</span>
+                          </div>
+                          {selectedVoiceId === v.voiceURI && <Check size={14} className="check-icon" />}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="no-system-voice-note">
+                        <span>Chưa phát hiện giọng Tiếng Việt cài sẵn trên Windows/trình duyệt.</span>
+                        <button
+                          type="button"
+                          className="btn-open-guide-link"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowVoiceMenu(false);
+                            setShowWindowsHelp(true);
+                          }}
+                        >
+                          <HelpCircle size={12} /> Hướng dẫn cài thêm vào Windows
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* TỐC ĐỘ ĐỌC DROPDOWN */}
+              <div className="audio-dropdown-wrap">
+                <button
+                  type="button"
+                  className={`audio-btn audio-btn-speed ${showSpeedMenu ? 'active' : ''}`}
+                  onClick={() => {
+                    setShowSpeedMenu(prev => !prev);
+                    setShowVoiceMenu(false);
+                  }}
+                  title="Thay đổi tốc độ đọc"
+                >
+                  <Gauge size={13} />
+                  <span>{speechRate}x</span>
+                  <ChevronDown size={11} />
+                </button>
+
+                {showSpeedMenu && (
+                  <div className="audio-dropdown-menu speed-dropdown-menu">
+                    <div className="audio-dropdown-header">Tốc độ đọc:</div>
+                    {SPEED_OPTIONS.map(opt => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        className={`audio-dropdown-item ${speechRate === opt.value ? 'selected' : ''}`}
+                        onClick={() => handleChangeSpeed(opt.value)}
+                      >
+                        <span className="item-label">{opt.label}</span>
+                        <span className="item-desc">{opt.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-      )}
 
-      {/* NỘI DUNG VĂN BẢN VỚI TÍNH NĂNG HIGHLIGHT TỪNG CÂU VÀ CLICK ĐỂ ĐỌC */}
-      <div className="audio-plot-content">
-        <p className="audio-plot-paragraph">
-          {sentences.map((sentence, idx) => {
-            const isCurrent = idx === currentSentenceIndex && isPlaying;
-            return (
-              <span
-                key={idx}
-                className={`plot-sentence ${isCurrent ? 'is-active-sentence' : ''}`}
-                onClick={() => handleSentenceClick(idx)}
-                title="Bấm để phát đọc từ câu này"
-              >
-                {sentence}{' '}
-              </span>
-            );
-          })}
-        </p>
-      </div>
+          {/* LIVE PROGRESS BAR KHI ĐANG ĐỌC */}
+          {isPlaying && (
+            <div className="audio-progress-track">
+              <div
+                className="audio-progress-bar"
+                style={{ width: `${progressPercent}%` }}
+              />
+              <div className="audio-progress-info">
+                <span>Đang đọc: Câu {currentSentenceIndex + 1}/{sentences.length} • Giọng: {currentVoiceDisplayName}</span>
+                <span>{progressPercent}%</span>
+              </div>
+            </div>
+          )}
 
-      {/* FOOTER HINT */}
-      {isPlaying && (
-        <div className="audio-plot-footer-hint">
-          <span>💡 Mẹo: Bạn có thể bấm vào bất kỳ câu nào trong đoạn văn để chuyển giọng đọc ngay đến câu đó.</span>
+          {/* ĐOẠN VĂN TÓM TẮT DIỄN BIẾN */}
+          <div className="audio-plot-content">
+            <p className="audio-plot-paragraph">
+              {sentences.map((sentence, idx) => {
+                const isCurrent = idx === currentSentenceIndex && isPlaying;
+                return (
+                  <span
+                    key={idx}
+                    className={`plot-sentence ${isCurrent ? 'is-active-sentence' : ''}`}
+                    onClick={() => handleSentenceClick(idx)}
+                    title="Bấm để phát đọc từ câu này"
+                  >
+                    {sentence}{' '}
+                  </span>
+                );
+              })}
+            </p>
+          </div>
+
+          {/* FOOTER HINT */}
+          {isPlaying && (
+            <div className="audio-plot-footer-hint">
+              <span>💡 Mẹo: Bạn có thể bấm vào bất kỳ câu nào trong đoạn văn để chuyển giọng đọc ngay đến câu đó.</span>
+            </div>
+          )}
         </div>
       )}
 

@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { searchMovieWithGemini, loadCandidateDetails, getStoredGeminiKey } from '../services/geminiService';
 import { ScoreBadge } from './ScoreBadge';
 import { calculateUnifiedScore, getMovieBadge } from '../services/scoreEngine';
+import { resolveMovieTitles } from '../utils/movieTitleResolver';
 import { AudioPlotReader } from './AudioPlotReader';
+import { formatQuickSynopsis, formatFilmReview, parseYearToNumber } from '../utils/searchUtils';
 import {
   Sparkles,
   Search,
@@ -112,17 +114,33 @@ export function AISearchModal({
     }
   };
 
+  // Lọc và sắp xếp các candidate đủ chất lượng hiển thị theo NĂM SẢN XUẤT GIẢM DẦN (mới nhất lên đầu)
+  const sortedCandidates = useMemo(() => {
+    const rawList = searchResult?.candidates || [];
+    if (!Array.isArray(rawList) || rawList.length === 0) return [];
+
+    const valid = rawList.filter(cand => {
+      const hasPoster = !!cand.poster;
+      const hasCast = !!(cand.cast && cand.cast.trim());
+      const hasRating = !!(cand.imdbRating);
+      return hasPoster || hasCast || hasRating;
+    });
+
+    return [...valid].sort((a, b) => {
+      const yA = parseYearToNumber(a.year);
+      const yB = parseYearToNumber(b.year);
+      if (yB !== yA) {
+        return yB - yA; // Năm mới nhất lên đầu (giảm dần)
+      }
+      const rA = parseFloat(a.imdbRating) || 0;
+      const rB = parseFloat(b.imdbRating) || 0;
+      return rB - rA;
+    });
+  }, [searchResult?.candidates]);
+
   if (!isOpen) return null;
 
   const isShowingResults = searchResult || isLoading || error;
-
-  // Sắp xếp danh sách ứng viên theo Năm giảm dần (mới nhất lên đầu)
-  const sortedCandidates = (searchResult?.candidates || []).slice().sort((a, b) => {
-    const yearA = parseInt(a.year, 10) || 0;
-    const yearB = parseInt(b.year, 10) || 0;
-    if (yearB !== yearA) return yearB - yearA;
-    return (a.rank || 99999) - (b.rank || 99999);
-  });
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -133,7 +151,7 @@ export function AISearchModal({
             <div className="ai-modal-query-pill">
               <Sparkles size={16} className="ai-sparkle-pill-icon" />
               <span className="ai-modal-query-text">
-                Kết quả tra cứu AI cho: <strong>"{query}"</strong>
+                <strong>"{query}"</strong>
               </span>
             </div>
 
@@ -305,14 +323,14 @@ export function AISearchModal({
                         <div className="cand-info">
                           <div className="cand-title-row">
                             <span className="cand-title">{cand.title}</span>
-                            {cand.year && <span className="cand-year-badge">{cand.year}</span>}
-                          </div>
-                          <div className="cand-sub-row">
                             {cand.imdbRating ? (
                               <span className="cand-imdb-pill">★ {cand.imdbRating}</span>
                             ) : (
                               <span className="cand-imdb-pill cand-imdb-na">★ IMDb</span>
                             )}
+                          </div>
+                          <div className="cand-sub-row">
+                            {cand.year && <span className="cand-year-badge">{cand.year}</span>}
                             {cand.cast && <span className="cand-cast-text">• {cand.cast}</span>}
                           </div>
                         </div>
@@ -362,12 +380,19 @@ export function AISearchModal({
 
                     <div className="result-primary-info">
                       <div className="result-title-group">
-                        <h4 className="result-title">
-                          {searchResult.vietnameseTitle || searchResult.title}
-                        </h4>
-                        {searchResult.vietnameseTitle && searchResult.vietnameseTitle !== searchResult.title && (
-                          <span className="result-sub-title">{searchResult.title}</span>
-                        )}
+                        {(() => {
+                          const aiTitles = resolveMovieTitles(searchResult);
+                          return (
+                            <>
+                              <h4 className="result-title">
+                                {aiTitles.vietnameseTitle}
+                              </h4>
+                              {aiTitles.englishTitle && aiTitles.englishTitle !== aiTitles.vietnameseTitle && (
+                                <span className="result-sub-title">{aiTitles.englishTitle}</span>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
 
                       <div className="result-meta-line">
@@ -418,21 +443,38 @@ export function AISearchModal({
                     </div>
                   </div>
 
+                  {/* TÓM TẮT NHANH (NETFLIX-STYLE) */}
+                  {searchResult.synopsis && (
+                    <div className="result-consensus-box">
+                      <strong>Tóm tắt nhanh:</strong> {formatQuickSynopsis(searchResult.synopsis, 60)}
+                    </div>
+                  )}
+
+                  {/* THẺ PHÊ BÌNH PHIM (TỐI ĐA 200 TỪ) */}
+                  {(searchResult.filmReview || searchResult.criticConsensus) && (
+                    <div className="result-film-review-box">
+                      <div className="result-film-review-header">
+                        <div className="review-header-title">
+                          <Sparkles size={14} className="review-sparkle-icon" />
+                          <span>Phê bình phim</span>
+                        </div>
+                        <span className="review-tag">Góc nhìn & Ý nghĩa</span>
+                      </div>
+                      <p className="result-film-review-text">
+                        {formatFilmReview(searchResult.filmReview || searchResult.criticConsensus, 200)}
+                      </p>
+                    </div>
+                  )}
+
                   {/* AUDIO SPOILER PLOT READER */}
                   {(searchResult.detailedPlot || searchResult.synopsis) && (
                     <div className="result-plot-box">
                       <AudioPlotReader
                         text={searchResult.detailedPlot || searchResult.synopsis}
-                        title="Tóm Tắt Cốt Truyện & Diễn Biến"
-                        spoilerTag="Spoiler • Tiết lộ nội dung"
+                        title="Tóm tắt diễn biến"
+                        spoilerTag="Spoiler"
+                        defaultExpanded={false}
                       />
-                    </div>
-                  )}
-
-                  {/* CRITIC CONSENSUS */}
-                  {searchResult.criticConsensus && (
-                    <div className="result-consensus-box">
-                      <strong>Nhận định chuyên môn:</strong> {searchResult.criticConsensus}
                     </div>
                   )}
                 </div>

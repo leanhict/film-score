@@ -5,6 +5,8 @@
  */
 
 import { fetchLiveMovieRatings, enhanceWithGemini, fetchMovieById } from './movieDataService.js';
+import { resolveMovieTitles } from '../utils/movieTitleResolver.js';
+import { formatQuickSynopsis, formatDetailedPlot, formatFilmReview } from '../utils/searchUtils.js';
 
 const LOCAL_STORAGE_KEY = 'filmscore_gemini_api_key';
 
@@ -78,7 +80,7 @@ export async function loadCandidateDetails(imdbID) {
  */
 async function fetchDirectlyFromGemini(query, apiKey) {
   const prompt = `
-Bạn là chuyên gia thẩm định và phân tích điện ảnh. Hãy tra cứu và cung cấp thông tin, điểm số CHÍNH XÁC THỰC TẾ từ IMDb, Rotten Tomatoes và Metacritic của bộ phim: "${query}".
+Bạn là chuyên gia thẩm định và phân tích điện ảnh và phim truyền hình / series. Hãy tra cứu và cung cấp thông tin, điểm số CHÍNH XÁC THỰC TẾ từ IMDb, Rotten Tomatoes và Metacritic của tác phẩm (phim điện ảnh hoặc TV Series / Netflix Original): "${query}".
 
 LƯU Ý CỰC KỲ QUAN TRỌNG:
 - Điểm IMDb (thang điểm 10) phải là điểm số thực tế trên trang imdb.com. Tuyệt đối không tự bịa hoặc phóng đại điểm số!
@@ -91,16 +93,17 @@ Trả về duy nhất định dạng JSON (không dùng markdown codeblock, khô
   "title": "Tên phim gốc tiếng Anh hoặc bản địa",
   "vietnameseTitle": "Tên phim tiếng Việt chính thức hoặc dịch chuẩn",
   "year": 2024,
-  "runtime": "95 phút",
-  "director": "Tên đạo diễn chính xác",
+  "runtime": "Thời lượng (ví dụ '115 phút' hoặc '2 Mùa')",
+  "director": "Tên đạo diễn hoặc Nhà sáng tạo (Creator)",
   "cast": ["Diễn viên 1", "Diễn viên 2", "Diễn viên 3"],
   "genres": ["Thể loại tiếng Việt 1", "Thể loại 2"],
   "country": "Quốc gia",
   "poster": "URL ảnh poster thực tế nếu có hoặc URL placeholder đẹp",
   "backdrop": "URL ảnh banner",
   "trailerUrl": "URL trailer youtube chính thức hoặc link tìm kiếm",
-  "synopsis": "Tóm tắt ngắn gọn 1-2 câu tiếng Việt",
-  "detailedPlot": "Tóm tắt toàn bộ cốt truyện chi tiết kiểu spoiler (150-300 từ) kể trực diện các biến cố, bước ngoặt và kết cục của nhân vật, không dùng lời văn quảng cáo hay nhận xét sáo rỗng",
+  "synopsis": "Tóm tắt ngắn gọn KHÔNG SPOILER (tối đa 60 chữ) theo phong cách chú thích phim Netflix / rạp chiếu, giới thiệu tiền đề câu chuyện mà tuyệt đối không tiết lộ plot twist hay kết cục",
+  "detailedPlot": "Tóm tắt TOÀN BỘ cốt truyện từ đầu đến cuối ĐẦY ĐỦ TRỌN VẸN TRONG PHẠM VI TỐI ĐA 200 CHỮ (khoảng 130 - 180 từ tiếng Việt), tuyệt đối không dừng giữa chừng. Phải tóm lược mạch lạc 4 giai đoạn: 1. Mở đầu & bối cảnh -> 2. Diễn biến mâu thuẫn -> 3. Nút thắt / Biến cố cao trào -> 4. Kết cục trọn vẹn và số phận cuối cùng của các nhân vật chính.",
+  "filmReview": "Bài phê bình và nhận định phim chuyên sâu (tối đa 200 từ tiếng Việt): Nhận xét đánh giá tổng quan, phân tích những thông điệp và ý nghĩa nhân văn/nghệ thuật sâu sắc của tác phẩm, nêu bật các điểm tốt nổi trội (chỉ đạo đạo diễn, diễn xuất, kịch bản, âm nhạc, góc quay) và lý do phim xứng đáng thưởng thức.",
   "criticConsensus": "Nhận định tổng quan của giới phê bình bằng tiếng Việt phản ánh đúng mức điểm",
   "audienceSentiment": "Cảm nhận của khán giả đại chúng bằng tiếng Việt phản ánh đúng mức điểm",
   "ratings": {
@@ -143,8 +146,21 @@ Trả về duy nhất định dạng JSON (không dùng markdown codeblock, khô
   const clean = raw.replace(/```json/g, '').replace(/```/g, '').trim();
   const parsed = JSON.parse(clean);
 
+  const resolved = resolveMovieTitles({
+    title: parsed.title,
+    originalTitle: parsed.title,
+    vietnameseTitle: parsed.vietnameseTitle,
+    englishTitle: parsed.englishTitle || parsed.title
+  });
+
   return {
     ...parsed,
+    title: resolved.englishTitle || parsed.title,
+    englishTitle: resolved.englishTitle || parsed.title,
+    vietnameseTitle: resolved.vietnameseTitle || parsed.vietnameseTitle || parsed.title,
+    synopsis: formatQuickSynopsis(parsed.synopsis, 60),
+    detailedPlot: formatDetailedPlot(parsed.detailedPlot, 200),
+    filmReview: formatFilmReview(parsed.filmReview, 200),
     id: `ai-gemini-${Date.now()}`,
     candidates: [],
     source: 'Google Gemini AI Realtime Search',

@@ -2,6 +2,8 @@
  * Bộ công cụ hỗ trợ tìm kiếm tiếng Việt thông minh (Hỗ trợ có dấu, không dấu, viết tắt, và từ đồng nghĩa)
  */
 
+import { MOVIE_TITLE_DATABASE } from './movieTitleResolver.js';
+
 // Bảng tra cứu tên phim tiếng Việt phổ biến sang tên gốc quốc tế
 export const VIETNAMESE_TITLE_MAP = {
   'ky si bong dem': 'The Dark Knight',
@@ -85,7 +87,27 @@ export const VIETNAMESE_TITLE_MAP = {
   'lat mat': 'Face Off',
   'lật mặt': 'Face Off',
   'lat mat 7': 'Face Off 7: One Wish',
-  'lật mặt 7': 'Face Off 7: One Wish'
+  'lật mặt 7': 'Face Off 7: One Wish',
+  'nu tu chien binh': 'Warrior Nun',
+  'nữ tu chiến binh': 'Warrior Nun',
+  'tro choi con muc': 'Squid Game',
+  'trò chơi con mực': 'Squid Game',
+  'vinh quang trong thu han': 'The Glory',
+  'vinh quang trong thù hận': 'The Glory',
+  'ha canh noi anh': 'Crash Landing on You',
+  'hạ cánh nơi anh': 'Crash Landing on You',
+  'tho san quai vat': 'The Witcher',
+  'thợ săn quái vật': 'The Witcher',
+  'cau be mat tich': 'Stranger Things',
+  'cậu bé mất tích': 'Stranger Things',
+  'nu hoang nuoc mat': 'Queen of Tears',
+  'nữ hoàng nước mắt': 'Queen of Tears',
+  'phi vu trieu do': 'Money Heist',
+  'phi vụ triệu đô': 'Money Heist',
+  'bong ma anh quoc': 'Peaky Blinders',
+  'bóng ma anh quốc': 'Peaky Blinders',
+  'tam the': '3 Body Problem',
+  'tam thể': '3 Body Problem'
 };
 
 /**
@@ -124,7 +146,7 @@ export function matchMovieSearch(movie, query = '') {
   const normQ = normalizeSearchString(q);
 
   // 1. Kiểm tra ánh xạ tên phim tiếng Việt sang tiếng Anh
-  const mappedTitle = VIETNAMESE_TITLE_MAP[rawQ] || VIETNAMESE_TITLE_MAP[normQ];
+  const mappedTitle = VIETNAMESE_TITLE_MAP[rawQ] || VIETNAMESE_TITLE_MAP[normQ] || MOVIE_TITLE_DATABASE[rawQ]?.en || MOVIE_TITLE_DATABASE[rawQ]?.vi;
   if (mappedTitle) {
     const normMapped = normalizeSearchString(mappedTitle);
     if (normalizeSearchString(movie.title).includes(normMapped) || normalizeSearchString(movie.vietnameseTitle).includes(normMapped)) {
@@ -169,3 +191,136 @@ export function matchMovieSearch(movie, query = '') {
 
   return false;
 }
+
+/**
+ * Đếm số từ trong đoạn văn bản
+ */
+export function countWords(text = '') {
+  if (!text) return 0;
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+/**
+ * Định dạng và chuẩn hóa Tóm tắt nhanh phong cách Netflix (Non-spoiler, tối đa 60 từ)
+ */
+export function formatQuickSynopsis(text = '', maxWords = 60) {
+  if (!text || typeof text !== 'string') return '';
+  let clean = text.replace(/\s+/g, ' ').trim();
+  
+  // Loại bỏ các tiền tố thừa nếu có
+  clean = clean.replace(/^(Tóm tắt nhanh|Tóm tắt|Chú thích|Nội dung tóm tắt|Nội dung|Cốt truyện|Giới thiệu)\s*:\s*/i, '');
+
+  const words = clean.split(/\s+/).filter(Boolean);
+  if (words.length <= maxWords) {
+    return clean;
+  }
+
+  // Cắt tới maxWords từ
+  const truncated = words.slice(0, maxWords).join(' ');
+  const lastPeriod = truncated.lastIndexOf('.');
+  const lastExcl = truncated.lastIndexOf('!');
+  const lastQ = truncated.lastIndexOf('?');
+  const lastSentenceEnd = Math.max(lastPeriod, lastExcl, lastQ);
+
+  // Nếu trong phạm vi >= 25 từ có điểm kết thúc câu hoàn chỉnh thì lấy trọn vẹn câu
+  if (lastSentenceEnd > 0) {
+    const candidate = truncated.slice(0, lastSentenceEnd + 1).trim();
+    const cWords = candidate.split(/\s+/).filter(Boolean).length;
+    if (cWords >= 25) {
+      return candidate;
+    }
+  }
+
+  // Cắt mượt mà và thêm dấu ...
+  const polished = truncated.replace(/[,;:\-\s]+$/, '');
+  return `${polished}...`;
+}
+
+/**
+ * Định dạng và chuẩn hóa Tóm tắt diễn biến chi tiết (Spoiler, tối đa 200 từ)
+ * Đảm bảo văn bản hoàn chỉnh, kết thúc bằng dấu câu trọn vẹn trong giới hạn 200 từ
+ */
+export function formatDetailedPlot(text = '', maxWords = 200) {
+  if (!text || typeof text !== 'string') return '';
+  let clean = text.replace(/\s+/g, ' ').trim();
+
+  // Loại bỏ các tiền tố thừa nếu có
+  clean = clean.replace(/^(Tóm tắt diễn biến|Tóm tắt cốt truyện|Cốt truyện chi tiết|Cốt truyện|Diễn biến)\s*:\s*/i, '');
+
+  const words = clean.split(/\s+/).filter(Boolean);
+  if (words.length <= maxWords) {
+    return clean;
+  }
+
+  // Cắt tới maxWords từ
+  const truncated = words.slice(0, maxWords).join(' ');
+  const lastPeriod = truncated.lastIndexOf('.');
+  const lastExcl = truncated.lastIndexOf('!');
+  const lastQ = truncated.lastIndexOf('?');
+  const lastSentenceEnd = Math.max(lastPeriod, lastExcl, lastQ);
+
+  // Nếu trong phạm vi >= 60 từ có điểm kết thúc câu hoàn chỉnh thì lấy trọn vẹn câu
+  if (lastSentenceEnd > 0) {
+    const candidate = truncated.slice(0, lastSentenceEnd + 1).trim();
+    const cWords = candidate.split(/\s+/).filter(Boolean).length;
+    if (cWords >= 60) {
+      return candidate;
+    }
+  }
+
+  // Cắt mượt mà và thêm dấu ...
+  const polished = truncated.replace(/[,;:\-\s]+$/, '');
+  return `${polished}...`;
+}
+
+/**
+ * Định dạng và chuẩn hóa Bài Phê Bình Phim (tối đa 200 từ)
+ * Bao gồm nhận xét, nhận định phim, những ý nghĩa và các điểm tốt nổi bật của tác phẩm
+ */
+export function formatFilmReview(text = '', maxWords = 200) {
+  if (!text || typeof text !== 'string') return '';
+  let clean = text.replace(/\s+/g, ' ').trim();
+
+  // Loại bỏ các tiền tố thừa nếu có
+  clean = clean.replace(/^(Phê bình phim|Phê bình|Nhận định phê bình|Đánh giá chuyên sâu|Nhận xét & Ý nghĩa|Đánh giá phim|Bài phê bình)\s*:\s*/i, '');
+
+  const words = clean.split(/\s+/).filter(Boolean);
+  if (words.length <= maxWords) {
+    return clean;
+  }
+
+  // Cắt tới maxWords từ
+  const truncated = words.slice(0, maxWords).join(' ');
+  const lastPeriod = truncated.lastIndexOf('.');
+  const lastExcl = truncated.lastIndexOf('!');
+  const lastQ = truncated.lastIndexOf('?');
+  const lastSentenceEnd = Math.max(lastPeriod, lastExcl, lastQ);
+
+  // Nếu trong phạm vi >= 60 từ có điểm kết thúc câu hoàn chỉnh thì lấy trọn vẹn câu
+  if (lastSentenceEnd > 0) {
+    const candidate = truncated.slice(0, lastSentenceEnd + 1).trim();
+    const cWords = candidate.split(/\s+/).filter(Boolean).length;
+    if (cWords >= 60) {
+      return candidate;
+    }
+  }
+
+  // Cắt mượt mà và thêm dấu ...
+  const polished = truncated.replace(/[,;:\-\s]+$/, '');
+  return `${polished}...`;
+}
+
+/**
+ * Trích xuất năm sản xuất / phát hành thành số nguyên chuẩn xác
+ * Hỗ trợ các định dạng: 2024, "2024", "2015–2020", "2015-", "2015-05-12", null, undefined
+ */
+export function parseYearToNumber(yearVal) {
+  if (!yearVal && yearVal !== 0) return 0;
+  if (typeof yearVal === 'number') return isNaN(yearVal) ? 0 : yearVal;
+  const str = String(yearVal).trim();
+  const match = str.match(/\b(18\d\d|19\d\d|20\d\d)\b/);
+  if (match) return parseInt(match[1], 10);
+  const parsed = parseInt(str, 10);
+  return isNaN(parsed) ? 0 : parsed;
+}
+

@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { searchMovieWithGemini, loadCandidateDetails } from '../services/geminiService.js';
 import { ScoreBadge } from './ScoreBadge.jsx';
 import { calculateUnifiedScore } from '../services/scoreEngine.js';
+import { resolveMovieTitles } from '../utils/movieTitleResolver.js';
+import { formatQuickSynopsis, formatFilmReview, parseYearToNumber } from '../utils/searchUtils.js';
 import {
   Sparkles,
   Search,
@@ -144,6 +146,30 @@ export function AISearchSection({
   const isUpcoming = searchResult && searchResult.year && searchResult.year > 2024 &&
     searchResult.ratings?.imdb === null && searchResult.ratings?.rtCritics === null;
 
+  // Lọc và sắp xếp các candidate theo NĂM SẢN XUẤT GIẢM DẦN (mới nhất lên đầu)
+  const sortedCandidates = useMemo(() => {
+    const rawList = searchResult?.candidates || [];
+    if (!Array.isArray(rawList) || rawList.length === 0) return [];
+
+    const valid = rawList.filter(cand => {
+      const hasPoster = !!cand.poster;
+      const hasCast = !!(cand.cast && cand.cast.trim());
+      const hasRating = !!(cand.imdbRating);
+      return hasPoster || hasCast || hasRating;
+    });
+
+    return [...valid].sort((a, b) => {
+      const yA = parseYearToNumber(a.year);
+      const yB = parseYearToNumber(b.year);
+      if (yB !== yA) {
+        return yB - yA;
+      }
+      const rA = parseFloat(a.imdbRating) || 0;
+      const rB = parseFloat(b.imdbRating) || 0;
+      return rB - rA;
+    });
+  }, [searchResult?.candidates]);
+
   return (
     <section className="ai-search-section" ref={sectionRef} id="ai-search-section">
       <div className="container">
@@ -270,14 +296,14 @@ export function AISearchSection({
               </button>
 
               {/* CANDIDATES LIST IF MULTIPLE RELEASES FOUND */}
-              {searchResult.candidates && searchResult.candidates.length > 1 && (
+              {sortedCandidates && sortedCandidates.length > 1 && (
                 <div className="candidates-section">
                   <div className="candidates-head">
                     <Layers size={16} className="head-ic" />
-                    <span>Tìm thấy {searchResult.candidates.length} tác phẩm cùng tên / liên quan trên IMDb:</span>
+                    <span>Tìm thấy {sortedCandidates.length} tác phẩm cùng tên / liên quan trên IMDb (sắp xếp mới nhất):</span>
                   </div>
                   <div className="candidates-scroll-row">
-                    {searchResult.candidates.map(cand => {
+                    {sortedCandidates.map(cand => {
                       const isSelected = cand.imdbID === searchResult.id;
                       return (
                         <button
@@ -295,10 +321,18 @@ export function AISearchSection({
                             />
                           )}
                           <div className="candidate-info-text">
-                            <span className="candidate-title">{cand.title}</span>
-                            <span className="candidate-meta">
-                              {cand.year ? `${cand.year}` : 'N/A'} {cand.cast ? `• ${cand.cast}` : ''}
-                            </span>
+                            <div className="cand-title-row">
+                              <span className="candidate-title">{cand.title}</span>
+                              {cand.imdbRating ? (
+                                <span className="cand-imdb-pill">★ {cand.imdbRating}</span>
+                              ) : (
+                                <span className="cand-imdb-pill cand-imdb-na">★ IMDb</span>
+                              )}
+                            </div>
+                            <div className="cand-sub-row">
+                              {cand.year && <span className="cand-year-badge">{cand.year}</span>}
+                              {cand.cast && <span className="cand-cast-text">• {cand.cast}</span>}
+                            </div>
                           </div>
                           {isSelected && (
                             <span className="candidate-active-tag">
@@ -343,18 +377,25 @@ export function AISearchSection({
                   </div>
 
                   <div className="movie-details-column">
-                    <div className="title-and-year-row">
-                      <h3 className="result-main-title">
-                        {searchResult.vietnameseTitle || searchResult.title}
-                      </h3>
-                      {searchResult.year && (
-                        <span className="year-pill">{searchResult.year}</span>
-                      )}
-                    </div>
+                    {(() => {
+                      const aiTitles = resolveMovieTitles(searchResult);
+                      return (
+                        <>
+                          <div className="title-and-year-row">
+                            <h3 className="result-main-title">
+                              {aiTitles.vietnameseTitle}
+                            </h3>
+                            {searchResult.year && (
+                              <span className="year-pill">{searchResult.year}</span>
+                            )}
+                          </div>
 
-                    {searchResult.vietnameseTitle && searchResult.vietnameseTitle !== searchResult.title && (
-                      <h4 className="result-original-title">{searchResult.title}</h4>
-                    )}
+                          {aiTitles.englishTitle && aiTitles.englishTitle !== aiTitles.vietnameseTitle && (
+                            <h4 className="result-original-title">{aiTitles.englishTitle}</h4>
+                          )}
+                        </>
+                      );
+                    })()}
 
                     <div className="meta-pills-row">
                       {searchResult.runtime && searchResult.runtime !== 'N/A' && (
@@ -386,26 +427,38 @@ export function AISearchSection({
                       )}
                     </div>
 
-                    {/* VIỆT HÓA TÓM TẮT TIỀN ĐỀ */}
+                    {/* TÓM TẮT NHANH (NETFLIX-STYLE) */}
                     {searchResult.synopsis && (
-                      <p className="result-plot-text">{searchResult.synopsis}</p>
+                      <div className="result-consensus-box">
+                        <div className="consensus-title">Tóm tắt nhanh:</div>
+                        <p>{formatQuickSynopsis(searchResult.synopsis, 60)}</p>
+                      </div>
+                    )}
+
+                    {/* THẺ PHÊ BÌNH PHIM (TỐI ĐA 200 TỪ) */}
+                    {(searchResult.filmReview || searchResult.criticConsensus) && (
+                      <div className="result-film-review-box">
+                        <div className="result-film-review-header">
+                          <div className="review-header-title">
+                            <Sparkles size={14} className="review-sparkle-icon" />
+                            <span>Phê bình phim</span>
+                          </div>
+                          <span className="review-tag">Góc nhìn & Ý nghĩa</span>
+                        </div>
+                        <p className="result-film-review-text">
+                          {formatFilmReview(searchResult.filmReview || searchResult.criticConsensus, 200)}
+                        </p>
+                      </div>
                     )}
 
                     {/* THẺ TÓM TẮT CỐT TRUYỆN CHI TIẾT (SPOILER) KÈM CHỨC NĂNG ĐỌC GIỌNG NÓI AI */}
                     {(searchResult.detailedPlot || searchResult.synopsis) && (
                       <AudioPlotReader
                         text={searchResult.detailedPlot || searchResult.synopsis}
-                        title="Tóm Tắt Cốt Truyện & Diễn Biến"
-                        spoilerTag="Spoiler • Tiết lộ nội dung"
+                        title="Tóm tắt diễn biến"
+                        spoilerTag="Spoiler"
+                        defaultExpanded={false}
                       />
-                    )}
-
-                    {/* CRITIC CONSENSUS */}
-                    {searchResult.criticConsensus && (
-                      <div className="result-consensus-box">
-                        <div className="consensus-title">Nhận định chuyên môn:</div>
-                        <p>{searchResult.criticConsensus}</p>
-                      </div>
                     )}
 
                     {/* ACTIONS */}

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { calculateUnifiedScore } from '../services/scoreEngine';
-import { matchMovieSearch } from '../utils/searchUtils';
+import { matchMovieSearch, parseYearToNumber } from '../utils/searchUtils';
 import {
   Film,
   Search,
@@ -28,12 +28,22 @@ export function Navbar({
   onResetHome
 }) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
   const searchRef = useRef(null);
+  const inputRef = useRef(null);
 
-  // Lọc kết quả tìm kiếm tức thì với hỗ trợ tiếng Việt có dấu/không dấu
+  // Lọc kết quả tìm kiếm tức thì với hỗ trợ tiếng Việt có dấu/không dấu, sắp xếp theo năm giảm dần
   const filteredSuggestions = searchQuery.trim()
-    ? allMovies.filter(m => matchMovieSearch(m, searchQuery)).slice(0, 5)
+    ? allMovies
+        .filter(m => matchMovieSearch(m, searchQuery))
+        .sort((a, b) => (parseYearToNumber(b.year) - parseYearToNumber(a.year)))
+        .slice(0, 5)
     : [];
+
+  // Reset index được chọn khi từ khóa thay đổi
+  useEffect(() => {
+    setSelectedIndex(-1);
+  }, [searchQuery]);
 
   // Đóng dropdown khi click ra ngoài
   useEffect(() => {
@@ -45,6 +55,72 @@ export function Navbar({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Xử lý khi nhấn nút Tìm kiếm hoặc bấm Enter
+  const handleSearchSubmit = (e) => {
+    if (e) e.preventDefault();
+    const query = searchQuery.trim();
+    if (!query) return;
+
+    // Đóng dropdown gợi ý
+    setIsDropdownOpen(false);
+    
+    // Blur ô nhập liệu để ẩn bàn phím ảo di động
+    if (inputRef.current) {
+      inputRef.current.blur();
+    }
+
+    // Kiểm tra xem kho phim hiện tại có kết quả nào không
+    const hasLocalMatches = allMovies.some(m => matchMovieSearch(m, query));
+    if (!hasLocalMatches) {
+      onOpenAISearch(query);
+      return;
+    }
+
+    // Nếu có kết quả trong danh sách, cuộn mượt xuống khu vực danh sách phim
+    const mainContent = document.querySelector('.main-content') || document.querySelector('.movies-grid');
+    if (mainContent) {
+      const topOffset = 75;
+      const elementPosition = mainContent.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - topOffset;
+      window.scrollTo({
+        top: Math.max(0, offsetPosition),
+        behavior: 'smooth'
+      });
+    }
+  };
+
+  // Điều hướng bằng bàn phím
+  const handleKeyDown = (e) => {
+    if (!searchQuery.trim()) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (!isDropdownOpen) {
+        setIsDropdownOpen(true);
+        return;
+      }
+      if (filteredSuggestions.length > 0) {
+        setSelectedIndex(prev => (prev < filteredSuggestions.length - 1 ? prev + 1 : 0));
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (filteredSuggestions.length > 0) {
+        setSelectedIndex(prev => (prev > 0 ? prev - 1 : filteredSuggestions.length - 1));
+      }
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (isDropdownOpen && selectedIndex >= 0 && selectedIndex < filteredSuggestions.length) {
+        onSelectMovie(filteredSuggestions[selectedIndex]);
+        setIsDropdownOpen(false);
+      } else {
+        handleSearchSubmit(e);
+      }
+    } else if (e.key === 'Escape') {
+      setIsDropdownOpen(false);
+      setSelectedIndex(-1);
+    }
+  };
 
   return (
     <header className="navbar-container">
@@ -75,9 +151,17 @@ export function Navbar({
 
         {/* SEARCH BAR WITH AI TRIGGER DROPDOWN */}
         <div className="navbar-search-wrapper" ref={searchRef}>
-          <div className="navbar-search-box">
-            <Search size={17} className="nav-search-icon" />
+          <form className="navbar-search-box" onSubmit={handleSearchSubmit}>
+            <button
+              type="submit"
+              className="nav-search-btn"
+              title="Tìm kiếm"
+              aria-label="Tìm kiếm"
+            >
+              <Search size={16} />
+            </button>
             <input
+              ref={inputRef}
               type="text"
               placeholder="Tìm phim, đạo diễn, tra cứu AI..."
               value={searchQuery}
@@ -85,69 +169,94 @@ export function Navbar({
                 onSearchChange(e.target.value);
                 setIsDropdownOpen(true);
               }}
-              onFocus={() => setIsDropdownOpen(true)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && searchQuery.trim()) {
-                  if (filteredSuggestions.length === 1) {
-                    onSelectMovie(filteredSuggestions[0]);
-                    setIsDropdownOpen(false);
-                  } else if (filteredSuggestions.length === 0) {
-                    onOpenAISearch(searchQuery);
-                    setIsDropdownOpen(false);
-                  }
+              onFocus={() => {
+                if (searchQuery.trim()) {
+                  setIsDropdownOpen(true);
                 }
               }}
+              onKeyDown={handleKeyDown}
               className="nav-search-input"
             />
             {searchQuery && (
               <button
+                type="button"
                 className="nav-clear-search-btn"
                 onClick={() => {
                   onSearchChange('');
                   setIsDropdownOpen(false);
+                  setSelectedIndex(-1);
+                  if (inputRef.current) inputRef.current.focus();
                 }}
+                title="Xóa từ khóa"
               >
                 <X size={14} />
               </button>
             )}
-          </div>
+          </form>
 
-          {/* SEARCH AUTOCOMPLETE DROPDOWN (Chỉ hiện khi có phim trùng khớp trong kho) */}
-          {isDropdownOpen && searchQuery.trim().length > 0 && filteredSuggestions.length > 0 && (
+          {/* SEARCH AUTOCOMPLETE DROPDOWN */}
+          {isDropdownOpen && searchQuery.trim().length > 0 && (
             <div className="search-dropdown-menu glass-modal animate-fade-in">
-              <div className="dropdown-local-results">
-                <span className="dropdown-section-label">Phim có sẵn trong kho:</span>
-                {filteredSuggestions.map(movie => {
-                  const score = calculateUnifiedScore(movie.ratings, weights);
-                  return (
-                    <div
-                      key={movie.id}
-                      className="dropdown-movie-row"
-                      onClick={() => {
-                        onSelectMovie(movie);
-                        setIsDropdownOpen(false);
-                      }}
-                    >
-                      <img
-                        src={movie.poster}
-                        alt={movie.title}
-                        className="dropdown-poster"
-                        onError={(e) => {
-                          e.target.onerror = null;
-                          e.target.src = 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=800&q=80';
+              {filteredSuggestions.length > 0 ? (
+                <div className="dropdown-local-results">
+                  <div className="dropdown-header-row">
+                    <span className="dropdown-section-label">Gợi ý phim phù hợp:</span>
+                  </div>
+                  {filteredSuggestions.map((movie, index) => {
+                    const score = calculateUnifiedScore(movie.ratings, weights);
+                    const isSelected = index === selectedIndex;
+                    return (
+                      <div
+                        key={movie.id}
+                        className={`dropdown-movie-row ${isSelected ? 'selected' : ''}`}
+                        onClick={() => {
+                          onSelectMovie(movie);
+                          setIsDropdownOpen(false);
                         }}
-                      />
-                      <div className="dropdown-info">
-                        <h4 className="dropdown-title">{movie.vietnameseTitle || movie.title}</h4>
-                        <span className="dropdown-meta">{movie.year} • {movie.director}</span>
+                        onMouseEnter={() => setSelectedIndex(index)}
+                      >
+                        <img
+                          src={movie.poster}
+                          alt={movie.title}
+                          className="dropdown-poster"
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=800&q=80';
+                          }}
+                        />
+                        <div className="dropdown-info">
+                          <h4 className="dropdown-title">{movie.vietnameseTitle || movie.title}</h4>
+                          <span className="dropdown-meta">{movie.year} • {movie.director}</span>
+                        </div>
+                        <div className="dropdown-score-pill">
+                          {score} pts
+                        </div>
                       </div>
-                      <div className="dropdown-score-pill">
-                        {score} pts
-                      </div>
+                    );
+                  })}
+
+
+                </div>
+              ) : (
+                <div
+                  className="dropdown-ai-search-prompt"
+                  onClick={() => {
+                    onOpenAISearch(searchQuery);
+                    setIsDropdownOpen(false);
+                  }}
+                >
+                  <div className="ai-prompt-icon">
+                    <Sparkles size={18} />
+                  </div>
+                  <div className="ai-prompt-info">
+                    <div className="ai-prompt-title">
+                      Tra cứu <strong>"{searchQuery}"</strong> với AI
                     </div>
-                  );
-                })}
-              </div>
+                    <span className="ai-prompt-sub">Không có trong kho phim hiện tại • Bấm để AI tìm kiếm & thêm phim</span>
+                  </div>
+                  <div className="ai-prompt-arrow">→</div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -185,6 +294,15 @@ export function Navbar({
             {watchlistCount > 0 && (
               <span className="watchlist-badge-count">{watchlistCount}</span>
             )}
+          </button>
+
+          {/* AI SEARCH ICON - MOBILE ONLY */}
+          <button
+            className="nav-btn-icon nav-btn-icon-ai mobile-ai-btn"
+            onClick={() => onOpenAISearch(searchQuery)}
+            title="Tra cứu phim bất kỳ với Gemini AI"
+          >
+            <Sparkles size={18} />
           </button>
 
           {/* SETTINGS / WEIGHTS BUTTON */}

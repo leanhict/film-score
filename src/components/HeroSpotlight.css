@@ -1,11 +1,68 @@
 .hero-spotlight-container {
   position: relative;
-  min-height: 440px;
+  min-height: 520px;
   display: flex;
-  align-items: flex-end;
-  padding-bottom: 20px;
-  padding-top: 75px;
+  flex-direction: column;
+  justify-content: space-between;
+  padding-bottom: 24px;
+  padding-top: 18px;
   overflow: hidden;
+  gap: 20px;
+}
+
+/* TOP CATEGORY PILLS BAR ON BANNER */
+.hero-category-nav-wrap {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  margin-bottom: auto;
+}
+
+.hero-category-pills {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 2px 6px 2px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.hero-category-pills::-webkit-scrollbar {
+  display: none;
+}
+
+.hero-cat-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: rgba(15, 18, 27, 0.72);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-full);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.hero-cat-pill-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: var(--border-highlight);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.hero-cat-pill-btn.active {
+  background: var(--grad-unified);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4);
 }
 
 .hero-backdrop-layer {
@@ -27,7 +84,8 @@
 .hero-gradient-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to right, #08090e 0%, rgba(8, 9, 14, 0.85) 45%, rgba(8, 9, 14, 0.3) 100%),
+  background: linear-gradient(to bottom, rgba(8, 9, 14, 0.75) 0%, rgba(8, 9, 14, 0.25) 20%, transparent 40%),
+              linear-gradient(to right, #08090e 0%, rgba(8, 9, 14, 0.85) 45%, rgba(8, 9, 14, 0.3) 100%),
               linear-gradient(to top, #08090e 5%, transparent 60%);
 }
 
@@ -227,47 +285,55 @@
   border-color: var(--imdb-border);
 }
 
-/* SLIDE CONTROLS */
-.hero-slide-nav {
+/* SLIM SWIPE INDICATOR BAR */
+.hero-swipe-indicator-wrap {
+  position: relative;
+  z-index: 2;
+  width: 100%;
   display: flex;
-  align-items: center;
-  gap: 12px;
-  background: rgba(15, 18, 27, 0.75);
-  backdrop-filter: blur(12px);
-  padding: 8px 14px;
-  border-radius: var(--radius-full);
-  border: 1px solid var(--border-subtle);
-}
-
-.slide-arrow-btn {
-  color: var(--text-secondary);
-  display: flex;
-  align-items: center;
   justify-content: center;
-  transition: color var(--transition-fast);
+  margin-top: 10px;
 }
 
-.slide-arrow-btn:hover {
-  color: #fff;
-}
-
-.slide-dots {
+.hero-swipe-indicator-bar {
   display: flex;
+  align-items: center;
   gap: 6px;
+  background: rgba(15, 18, 27, 0.6);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.slide-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.2);
-  transition: all var(--transition-fast);
+.swipe-bar-segment {
+  width: 18px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.22);
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.slide-dot.active {
-  width: 24px;
-  border-radius: 4px;
-  background: var(--accent-indigo);
+.swipe-bar-segment:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.swipe-bar-segment.active {
+  width: 32px;
+  background: var(--grad-unified);
+  box-shadow: 0 0 10px rgba(99, 102, 241, 0.6);
+}
+
+.hero-spotlight-container {
+  touch-action: pan-y;
+  cursor: grab;
+}
+
+.hero-spotlight-container.is-dragging {
+  cursor: grabbing;
+  user-select: none;
 }
 
 @media (max-width: 900px) {
@@ -276,16 +342,25 @@
     align-items: stretch;
     gap: 16px;
   }
-  .hero-slide-nav {
-    align-self: flex-end;
-  }
 }
 
 @media (max-width: 768px) {
   .hero-spotlight-container {
     min-height: auto;
-    padding-top: 56px;
+    padding-top: 14px;
     padding-bottom: 6px;
+    gap: 10px;
+  }
+
+  .hero-category-pills {
+    gap: 5px;
+    padding: 2px 0 4px 0;
+  }
+
+  .hero-cat-pill-btn {
+    padding: 4px 10px;
+    font-size: 0.74rem;
+    gap: 4px;
   }
 
   .hero-content-wrapper {
@@ -525,25 +600,15 @@
     flex-shrink: 0;
   }
 
-  .hero-slide-nav {
-    align-self: center;
-    padding: 2px 6px;
-    gap: 6px;
-    margin-top: 0;
+  .hero-swipe-indicator-wrap {
+    margin-top: 6px;
   }
-
-  .slide-arrow-btn svg {
+  .swipe-bar-segment {
     width: 14px;
-    height: 14px;
+    height: 2.5px;
   }
-
-  .slide-dot {
-    width: 5px;
-    height: 5px;
-  }
-
-  .slide-dot.active {
-    width: 14px;
+  .swipe-bar-segment.active {
+    width: 24px;
   }
 }
 

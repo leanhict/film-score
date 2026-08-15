@@ -215,30 +215,7 @@ export function getMovieBadge(ratings = {}, isHiddenGem = false) {
     };
   }
 
-  // 7. Chất lượng chuẩn mực
-  if (unified >= 72) {
-    return {
-      key: 'balanced',
-      label: 'Đạt Chuẩn Điện Ảnh',
-      shortLabel: 'Chuẩn Mực',
-      icon: '✨',
-      className: 'badge-balanced',
-      color: '#34d399',
-      bg: 'rgba(16, 185, 129, 0.15)',
-      description: 'Bộ phim có chất lượng tốt, đồng đều và đáng xem trên mọi khía cạnh.',
-    };
-  }
-
-  return {
-    key: 'niche',
-    label: 'Kén Khán Giả',
-    shortLabel: 'Kén Người Xem',
-    icon: '☕',
-    className: 'badge-polarizing',
-    color: '#94a3b8',
-    bg: 'rgba(148, 163, 184, 0.15)',
-    description: 'Chất lượng trung bình hoặc thể nghiệm đặc thù hướng đến nhóm khán giả riêng biệt.',
-  };
+  return null;
 }
 
 /**

@@ -1,7 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { calculateUnifiedScore, getMovieBadge } from '../services/scoreEngine';
+import { NETFLIX_CATEGORIES } from '../services/netflixCatalogService';
+import { resolveMovieTitles } from '../utils/movieTitleResolver';
+import { formatQuickSynopsis } from '../utils/searchUtils';
 import { ScoreBadge } from './ScoreBadge';
-import { Play, Info, Bookmark, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
+import { Play, Info, Bookmark, Sparkles } from 'lucide-react';
 import './HeroSpotlight.css';
 
 export function HeroSpotlight({
@@ -10,14 +13,20 @@ export function HeroSpotlight({
   onSelectMovie,
   onOpenTrailer,
   watchlist = [],
-  onToggleWatchlist
+  onToggleWatchlist,
+  activeCategory,
+  onSelectCategory
 }) {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [touchStartX, setTouchStartX] = useState(null);
+  const [touchEndX, setTouchEndX] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStartX, setDragStartX] = useState(null);
 
   // Chỉ lọc hiển thị các phim có điểm số IMDb trên 6.5 cho Hero Banner
   const spotlightList = useMemo(() => {
     const qualified = (movies || []).filter(m => (m.ratings?.imdb || 0) > 6.5);
-    return (qualified.length > 0 ? qualified : (movies || []).filter(m => (m.ratings?.imdb || 0) >= 6.0)).slice(0, 5);
+    return (qualified.length > 0 ? qualified : (movies || []).filter(m => (m.ratings?.imdb || 0) >= 6.0)).slice(0, 6);
   }, [movies]);
 
   // Đảm bảo currentIndex luôn hợp lệ khi danh sách thay đổi
@@ -29,13 +38,14 @@ export function HeroSpotlight({
 
   const currentMovie = spotlightList[currentIndex] || spotlightList[0] || null;
 
-  // Auto slide mỗi 8s nếu người dùng không tương tác
-  useEffect(() => {
+  const handleNext = useCallback(() => {
     if (spotlightList.length <= 1) return;
-    const interval = setInterval(() => {
-      setCurrentIndex(prev => (prev + 1) % spotlightList.length);
-    }, 8000);
-    return () => clearInterval(interval);
+    setCurrentIndex(prev => (prev + 1) % spotlightList.length);
+  }, [spotlightList.length]);
+
+  const handlePrev = useCallback(() => {
+    if (spotlightList.length <= 1) return;
+    setCurrentIndex(prev => (prev - 1 + spotlightList.length) % spotlightList.length);
   }, [spotlightList.length]);
 
   if (!currentMovie) return null;
@@ -44,11 +54,70 @@ export function HeroSpotlight({
   const badge = getMovieBadge(currentMovie.ratings);
   const isWatchlisted = watchlist.some(m => m.id === currentMovie.id);
 
-  const handleNext = () => setCurrentIndex(prev => (prev + 1) % spotlightList.length);
-  const handlePrev = () => setCurrentIndex(prev => (prev - 1 + spotlightList.length) % spotlightList.length);
+  // Auto slide mỗi 8s nếu không có tương tác
+  useEffect(() => {
+    if (spotlightList.length <= 1) return;
+    const interval = setInterval(() => {
+      handleNext();
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [spotlightList.length, handleNext]);
+
+  // Vuốt chạm trên Mobile / Tablet
+  const handleTouchStart = (e) => {
+    setTouchEndX(null);
+    setTouchStartX(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchMove = (e) => {
+    setTouchEndX(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = () => {
+    if (touchStartX === null || touchEndX === null) return;
+    const diff = touchStartX - touchEndX;
+    if (diff > 45) {
+      handleNext(); // Vuốt sang trái -> Xem banner tiếp theo
+    } else if (diff < -45) {
+      handlePrev(); // Vuốt sang phải -> Xem banner phía trước
+    }
+    setTouchStartX(null);
+    setTouchEndX(null);
+  };
+
+  // Kéo chuột vuốt trên Desktop
+  const handleMouseDown = (e) => {
+    if (e.target.closest('button, a, select, input')) return;
+    setDragStartX(e.clientX);
+    setIsDragging(true);
+  };
+
+  const handleMouseUp = (e) => {
+    if (isDragging && dragStartX !== null) {
+      const diff = dragStartX - e.clientX;
+      if (diff > 45) {
+        handleNext();
+      } else if (diff < -45) {
+        handlePrev();
+      }
+    }
+    setIsDragging(false);
+    setDragStartX(null);
+  };
 
   return (
-    <div className="hero-spotlight-container">
+    <div
+      className={`hero-spotlight-container ${isDragging ? 'is-dragging' : ''}`}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onMouseDown={handleMouseDown}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={() => {
+        setIsDragging(false);
+        setDragStartX(null);
+      }}
+    >
       {/* BACKDROP IMAGE & GRADIENTS */}
       <div className="hero-backdrop-layer">
         <img
@@ -64,30 +133,54 @@ export function HeroSpotlight({
         <div className="hero-gradient-overlay" />
       </div>
 
+      {/* TOP CATEGORY PILLS BAR ON BANNER */}
+      {onSelectCategory && (
+        <div className="container hero-category-nav-wrap">
+          <div className="hero-category-pills">
+            {NETFLIX_CATEGORIES.map(cat => (
+              <button
+                key={cat.id}
+                className={`hero-cat-pill-btn ${activeCategory === cat.id ? 'active' : ''}`}
+                onClick={() => onSelectCategory(cat.id)}
+              >
+                <span className="cat-icon">{cat.icon}</span>
+                <span>{cat.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="container hero-content-wrapper">
         <div className="hero-content-left animate-fade-in" key={`content-${currentMovie.id}`}>
-          {/* BADGE & SPOTLIGHT TAG */}
-          <div className="hero-tag-row">
-            <span className="spotlight-tag">
-              <Sparkles size={14} className="sparkle-icon" /> Tác Phẩm Nổi Bật
-            </span>
-            {badge && (
-              <span className={`badge ${badge.className}`}>
-                {badge.icon} {badge.label}
-              </span>
-            )}
-            {currentMovie.country === 'Việt Nam' && (
-              <span className="badge badge-masterpiece">🇻🇳 Điện Ảnh Việt Nam</span>
-            )}
-          </div>
-
-          {/* TITLES */}
-          <h1 className="hero-main-title">
-            {currentMovie.vietnameseTitle || currentMovie.title}
-          </h1>
-          {currentMovie.vietnameseTitle && currentMovie.vietnameseTitle !== currentMovie.title && (
-            <h2 className="hero-sub-title">{currentMovie.title}</h2>
+          {/* BADGE ROW */}
+          {(badge || currentMovie.country === 'Việt Nam') && (
+            <div className="hero-tag-row">
+              {badge && (
+                <span className={`badge ${badge.className}`}>
+                  {badge.icon} {badge.label}
+                </span>
+              )}
+              {currentMovie.country === 'Việt Nam' && (
+                <span className="badge badge-masterpiece">🇻🇳 Điện Ảnh Việt Nam</span>
+              )}
+            </div>
           )}
+
+          {/* TITLES: VIETNAMESE (PRIMARY) + ENGLISH (SUBTITLE) */}
+          {(() => {
+            const heroTitles = resolveMovieTitles(currentMovie);
+            return (
+              <>
+                <h1 className="hero-main-title">
+                  {heroTitles.vietnameseTitle}
+                </h1>
+                {heroTitles.englishTitle && heroTitles.englishTitle !== heroTitles.vietnameseTitle && (
+                  <h2 className="hero-sub-title">{heroTitles.englishTitle}</h2>
+                )}
+              </>
+            );
+          })()}
 
           {/* META ROW */}
           <div className="hero-meta-row">
@@ -104,7 +197,7 @@ export function HeroSpotlight({
 
           {/* SYNOPSIS */}
           <p className="hero-synopsis">
-            {currentMovie.synopsis}
+            {formatQuickSynopsis(currentMovie.synopsis, 60)}
           </p>
 
           {/* SCORES ROW */}
@@ -154,27 +247,25 @@ export function HeroSpotlight({
             </button>
           </div>
         </div>
+      </div>
 
-        {/* SLIDE NAVIGATION CONTROLS */}
-        <div className="hero-slide-nav">
-          <button className="slide-arrow-btn" onClick={handlePrev} aria-label="Phim trước">
-            <ChevronLeft size={22} />
-          </button>
-          <div className="slide-dots">
+      {/* SLIM SWIPE INDICATOR BAR AT BOTTOM */}
+      {spotlightList.length > 1 && (
+        <div className="container hero-swipe-indicator-wrap">
+          <div className="hero-swipe-indicator-bar" title="Vuốt trái / phải để chuyển phim">
             {spotlightList.map((m, idx) => (
-              <button
+              <span
                 key={m.id}
-                className={`slide-dot ${idx === currentIndex ? 'active' : ''}`}
-                onClick={() => setCurrentIndex(idx)}
-                aria-label={`Chuyển tới phim ${m.title}`}
+                className={`swipe-bar-segment ${idx === currentIndex ? 'active' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCurrentIndex(idx);
+                }}
               />
             ))}
           </div>
-          <button className="slide-arrow-btn" onClick={handleNext} aria-label="Phim kế tiếp">
-            <ChevronRight size={22} />
-          </button>
         </div>
-      </div>
+      )}
     </div>
   );
 }

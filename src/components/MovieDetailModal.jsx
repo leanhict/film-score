@@ -1,9 +1,10 @@
 import React from 'react';
 import { calculateUnifiedScore, getMovieBadge } from '../services/scoreEngine';
+import { resolveMovieTitles } from '../utils/movieTitleResolver';
+import { formatQuickSynopsis, formatDetailedPlot, formatFilmReview } from '../utils/searchUtils';
 import { ScoreBadge } from './ScoreBadge';
-import { ScoreComparisonBar } from './ScoreComparisonBar';
 import { AudioPlotReader } from './AudioPlotReader';
-import { X, Play, Bookmark, Award, Film, Clock, Calendar, Tv, DollarSign, Quote } from 'lucide-react';
+import { X, Play, Bookmark, Award, Film, Clock, Calendar, Tv, DollarSign, Quote, Sparkles } from 'lucide-react';
 import './MovieDetailModal.css';
 
 export function MovieDetailModal({
@@ -22,12 +23,28 @@ export function MovieDetailModal({
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="movie-detail-modal glass-modal" onClick={(e) => e.stopPropagation()}>
-        {/* CLOSE BUTTON */}
-        <button className="modal-close-btn" onClick={onClose} aria-label="Đóng">
-          <X size={20} />
-        </button>
+        {/* TOP ACTIONS (WATCHLIST + CLOSE BUTTONS) */}
+        <div className="modal-top-actions">
+          <button
+            className={`modal-action-btn modal-watchlist-btn ${isWatchlisted ? 'active' : ''}`}
+            onClick={() => onToggleWatchlist && onToggleWatchlist(movie)}
+            aria-label={isWatchlisted ? 'Đã lưu vào danh sách muốn xem' : 'Thêm vào muốn xem'}
+            title={isWatchlisted ? 'Đã lưu vào Watchlist (Bấm để hủy)' : 'Thêm Vào Muốn Xem'}
+          >
+            <Bookmark size={18} fill={isWatchlisted ? 'currentColor' : 'none'} />
+          </button>
 
-        {/* HERO BANNER SECTION */}
+          <button
+            className="modal-action-btn modal-close-btn"
+            onClick={onClose}
+            aria-label="Đóng"
+            title="Đóng cửa sổ"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* HERO BANNER SECTION (CLEAN & FULL VISIBILITY) */}
         <div className="modal-hero-banner">
           <img
             src={movie.backdrop || movie.poster}
@@ -39,8 +56,12 @@ export function MovieDetailModal({
             }}
           />
           <div className="modal-banner-overlay" />
+        </div>
 
-          <div className="modal-banner-content">
+        {/* MODAL BODY */}
+        <div className="modal-body-content">
+          {/* HEADER INFO SECTION (PULLED DOWN WITH POSTER & TITLE/METADATA) */}
+          <div className="modal-header-info-wrap">
             <div className="modal-poster-wrap">
               <img
                 src={movie.poster}
@@ -65,12 +86,19 @@ export function MovieDetailModal({
                 )}
               </div>
 
-              <h2 className="modal-movie-title">
-                {movie.vietnameseTitle || movie.title}
-              </h2>
-              {movie.vietnameseTitle && movie.vietnameseTitle !== movie.title && (
-                <h3 className="modal-movie-original">{movie.title}</h3>
-              )}
+              {(() => {
+                const modalTitles = resolveMovieTitles(movie);
+                return (
+                  <>
+                    <h2 className="modal-movie-title">
+                      {modalTitles.vietnameseTitle}
+                    </h2>
+                    {modalTitles.englishTitle && modalTitles.englishTitle !== modalTitles.vietnameseTitle && (
+                      <h3 className="modal-movie-original">{modalTitles.englishTitle}</h3>
+                    )}
+                  </>
+                );
+              })()}
 
               <div className="modal-meta-grid">
                 <span><Calendar size={14} /> {movie.year}</span>
@@ -78,44 +106,31 @@ export function MovieDetailModal({
                 <span><Film size={14} /> {movie.director}</span>
               </div>
 
-              <div className="modal-cta-row">
-                {movie.trailerUrl && (
+              {movie.trailerUrl && (
+                <div className="modal-cta-row">
                   <button
                     className="modal-btn modal-btn-play"
                     onClick={() => onOpenTrailer && onOpenTrailer(movie)}
                   >
                     <Play size={16} fill="currentColor" /> Xem Trailer
                   </button>
-                )}
-
-                <button
-                  className={`modal-btn modal-btn-bookmark ${isWatchlisted ? 'active' : ''}`}
-                  onClick={() => onToggleWatchlist && onToggleWatchlist(movie)}
-                >
-                  <Bookmark size={16} fill={isWatchlisted ? 'currentColor' : 'none'} />
-                  {isWatchlisted ? 'Đã Lưu Vào Watchlist' : 'Thêm Vào Muốn Xem'}
-                </button>
-              </div>
+                </div>
+              )}
             </div>
           </div>
-        </div>
-
-        {/* MODAL BODY */}
-        <div className="modal-body-content">
           {/* CỤM ĐIỂM SỐ 3 NGUỒN */}
           <div className="modal-scores-section">
             <h4 className="section-mini-title">Bảng Điểm Nguồn Uy Tín</h4>
-            <div className="modal-score-badges-grid">
+            <div className="modal-scores-cluster">
               <ScoreBadge type="unified" score={unifiedScore} size="large" />
-              <ScoreBadge type="imdb" score={movie.ratings?.imdb} votes={movie.ratings?.imdbVotes} size="large" />
-              <ScoreBadge type="rtCritics" score={movie.ratings?.rtCritics} size="large" />
-              <ScoreBadge type="rtAudience" score={movie.ratings?.rtAudience} size="large" />
-              <ScoreBadge type="metacritic" score={movie.ratings?.metascore} size="large" />
+              <div className="modal-source-badges">
+                <ScoreBadge type="imdb" score={movie.ratings?.imdb} votes={movie.ratings?.imdbVotes} showSubtitle={true} />
+                <ScoreBadge type="rtCritics" score={movie.ratings?.rtCritics} showSubtitle={true} />
+                <ScoreBadge type="rtAudience" score={movie.ratings?.rtAudience} showSubtitle={true} />
+                <ScoreBadge type="metacritic" score={movie.ratings?.metascore} showSubtitle={true} />
+              </div>
             </div>
           </div>
-
-          {/* BIỂU ĐỒ SO SÁNH & ĐỐI CHIẾU CHÊNH LỆCH */}
-          <ScoreComparisonBar ratings={movie.ratings} />
 
           {/* NHẬN ĐỊNH CHUYÊN MÔN & CẢM NHẬN KHÁN GIẢ */}
           <div className="consensus-cards-grid">
@@ -139,14 +154,40 @@ export function MovieDetailModal({
               </div>
             )}
           </div>
+ 
+          {/* TÓM TẮT NHANH (NETFLIX-STYLE) */}
+          {movie.synopsis && (
+            <div className="modal-quick-synopsis-box">
+              <span className="quick-synopsis-tag">Tóm tắt nhanh:</span> {formatQuickSynopsis(movie.synopsis, 60)}
+            </div>
+          )}
 
-          {/* TÓM TẮT CỐT TRUYỆN & GIỌNG ĐỌC AI */}
+          {/* THẺ PHÊ BÌNH PHIM (TỐI ĐA 200 TỪ) */}
+          {(movie.filmReview || movie.movieReview || movie.criticConsensus) && (
+            <div className="modal-film-review-card">
+              <div className="film-review-header">
+                <div className="film-review-title-wrap">
+                  <div className="film-review-icon-badge">
+                    <Sparkles size={16} />
+                  </div>
+                  <h4 className="film-review-heading">Phê bình phim</h4>
+                </div>
+                <span className="film-review-tag">Góc nhìn & Ý nghĩa</span>
+              </div>
+              <p className="film-review-body">
+                {formatFilmReview(movie.filmReview || movie.movieReview || movie.criticConsensus, 200)}
+              </p>
+            </div>
+          )}
+
+          {/* TÓM TẮT DIỄN BIẾN & GIỌNG ĐỌC AI */}
           {(movie.detailedPlot || movie.synopsis) && (
             <div className="modal-section synopsis-section">
               <AudioPlotReader
-                text={movie.detailedPlot || movie.synopsis}
-                title={movie.detailedPlot ? "Tóm Tắt Cốt Truyện & Diễn Biến" : "Tóm Tắt Nội Dung Phim"}
-                spoilerTag={movie.detailedPlot ? "Spoiler • Tiết lộ nội dung" : ""}
+                text={formatDetailedPlot(movie.detailedPlot || movie.synopsis, 200)}
+                title="Tóm tắt diễn biến"
+                spoilerTag={movie.detailedPlot ? "Spoiler" : ""}
+                defaultExpanded={false}
               />
             </div>
           )}
