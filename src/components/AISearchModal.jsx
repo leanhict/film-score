@@ -4,7 +4,9 @@ import { ScoreBadge } from './ScoreBadge';
 import { calculateUnifiedScore, getMovieBadge } from '../services/scoreEngine';
 import { resolveMovieTitles } from '../utils/movieTitleResolver';
 import { AudioPlotReader } from './AudioPlotReader';
-import { formatQuickSynopsis, formatFilmReview, parseYearToNumber } from '../utils/searchUtils';
+import { formatQuickSynopsis, formatDetailedPlot, formatFilmReview, parseYearToNumber, getAgeRatingBadge, formatMovieCredits } from '../utils/searchUtils';
+import { isAdvisoryEligible } from '../utils/ageRatingAdvisory';
+import { AgeRatingDetailModal } from './AgeRatingDetailModal';
 import {
   Sparkles,
   Search,
@@ -16,8 +18,17 @@ import {
   Layers,
   Check,
   Star,
-  Film
+  Film,
+  Calendar,
+  Clock,
+  Quote,
+  X,
+  Users,
+  Building2,
+  Globe,
+  Info
 } from 'lucide-react';
+import './MovieDetailModal.css';
 import './AISearchModal.css';
 
 const SEARCH_SUGGESTIONS = [
@@ -45,6 +56,7 @@ export function AISearchModal({
   const [isSwitching, setIsSwitching] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [searchResult, setSearchResult] = useState(null);
+  const [isAgeAdvisoryOpen, setIsAgeAdvisoryOpen] = useState(false);
   const [error, setError] = useState(null);
   const [hasKey, setHasKey] = useState(false);
 
@@ -96,10 +108,25 @@ export function AISearchModal({
     setIsSwitching(true);
     try {
       const details = await loadCandidateDetails(cand.imdbID);
-      setSearchResult(prev => ({
-        ...details,
-        candidates: prev.candidates || []
-      }));
+      setSearchResult(prev => {
+        const prevCandidates = prev?.candidates || [];
+        const verifiedYear = parseYearToNumber(details.year);
+        const updatedCandidates = prevCandidates.map(c => {
+          if (c.imdbID === cand.imdbID || c.imdbID === details.id) {
+            return {
+              ...c,
+              year: verifiedYear || c.year,
+              imdbRating: details.ratings?.imdb || c.imdbRating,
+              title: details.vietnameseTitle || details.title || c.title
+            };
+          }
+          return c;
+        });
+        return {
+          ...details,
+          candidates: updatedCandidates
+        };
+      });
     } catch (err) {
       console.error('Lỗi khi tải chi tiết ứng viên:', err);
     } finally {
@@ -114,7 +141,7 @@ export function AISearchModal({
     }
   };
 
-  // Lọc và sắp xếp các candidate đủ chất lượng hiển thị theo NĂM SẢN XUẤT GIẢM DẦN (mới nhất lên đầu)
+  // Lọc và sắp xếp các candidate theo ĐỘ KHỚP TÊN & LIÊN QUAN (trùng tên lên đầu)
   const sortedCandidates = useMemo(() => {
     const rawList = searchResult?.candidates || [];
     if (!Array.isArray(rawList) || rawList.length === 0) return [];
@@ -127,14 +154,19 @@ export function AISearchModal({
     });
 
     return [...valid].sort((a, b) => {
-      const yA = parseYearToNumber(a.year);
-      const yB = parseYearToNumber(b.year);
-      if (yB !== yA) {
-        return yB - yA; // Năm mới nhất lên đầu (giảm dần)
+      const scoreA = a.relevanceScore || 0;
+      const scoreB = b.relevanceScore || 0;
+      if (scoreB !== scoreA) {
+        return scoreB - scoreA;
       }
       const rA = parseFloat(a.imdbRating) || 0;
       const rB = parseFloat(b.imdbRating) || 0;
-      return rB - rA;
+      if (rB !== rA) {
+        return rB - rA;
+      }
+      const yA = parseYearToNumber(a.year);
+      const yB = parseYearToNumber(b.year);
+      return yB - yA;
     });
   }, [searchResult?.candidates]);
 
@@ -299,7 +331,7 @@ export function AISearchModal({
                 <div className="candidates-header">
                   <Layers size={14} />
                   <span>
-                    Tìm thấy {sortedCandidates.length} tác phẩm cùng tên / liên quan trên IMDb (sắp xếp mới nhất):
+                    Tìm thấy {sortedCandidates.length} tác phẩm cùng tên / liên quan trên IMDb:
                   </span>
                 </div>
                 <div className="candidates-list-scroll">
@@ -346,155 +378,268 @@ export function AISearchModal({
               </div>
             )}
 
-            {/* MAIN COMPACT MOVIE RESULT CARD */}
-            <div className="result-main-card glass-panel">
-              <div className="result-top-info-strip">
-                <div className="result-source-chip">
-                  <Sparkles size={13} /> {searchResult.source || 'Nguồn IMDb, Rotten Tomatoes & Metacritic'}
-                </div>
-                {searchResult.country && (
-                  <span className="result-country-tag">📍 {searchResult.country}</span>
-                )}
-              </div>
-
+            {/* MAIN MOVIE RESULT CARD (SYNCHRONIZED WITH MOVIE DETAIL MODAL) */}
+            <div className="result-main-card glass-panel ai-movie-detail-card">
               {isSwitching ? (
                 <div className="switching-loading-box">
                   <Loader2 size={24} className="spin-icon" />
                   <span>Đang cập nhật điểm số và thông tin bản phát hành...</span>
                 </div>
               ) : (
-                <div className="result-layout-wrapper">
-                  {/* COMPACT POSTER & METRICS ROW */}
-                  <div className="result-hero-row">
-                    <div className="result-poster-wrap">
-                      <img
-                        src={searchResult.poster}
-                        alt={searchResult.title}
-                        className="result-poster-img"
-                        onError={(e) => {
-                          e.target.onerror = null;
-                          e.target.src = 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=800&q=80';
-                        }}
-                      />
-                    </div>
+                <>
+                  {/* HERO BANNER SECTION (CLEAN & FULL VISIBILITY) */}
+                  <div className="modal-hero-banner">
+                    <img
+                      src={searchResult.backdrop || searchResult.poster}
+                      alt={searchResult.title}
+                      className="modal-banner-img"
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = searchResult.poster || 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1600&q=80';
+                      }}
+                    />
+                    <div className="modal-banner-overlay" />
 
-                    <div className="result-primary-info">
-                      <div className="result-title-group">
+                    {/* CỤM BADGE & THỂ LOẠI Ở GÓC TRÁI BANNER LỚN */}
+                    <div className="modal-top-left-group">
+                      {(() => {
+                        const badge = getMovieBadge(searchResult.ratings);
+                        return badge ? (
+                          <div className="modal-top-left-badge">
+                            <span className={`badge ${badge.className}`}>
+                              {badge.icon} {badge.label}
+                            </span>
+                          </div>
+                        ) : null;
+                      })()}
+                      {(() => {
+                        const genresList = Array.isArray(searchResult.genres) 
+                          ? searchResult.genres 
+                          : (typeof searchResult.genres === 'string' ? searchResult.genres.split(',').map(g => g.trim()).filter(Boolean) : []);
+                        return genresList.length > 0 ? (
+                          <div className="modal-banner-genres">
+                            {genresList.map((genre, idx) => (
+                              <span key={idx} className="banner-genre-pill">{genre}</span>
+                            ))}
+                          </div>
+                        ) : null;
+                      })()}
+                    </div>
+                  </div>
+
+                  {/* MODAL BODY CONTENT */}
+                  <div className="modal-body-content">
+                    {/* HEADER INFO SECTION (PULLED DOWN WITH OVERLAPPING POSTER) */}
+                    <div className="modal-header-info-wrap">
+                      <div className="modal-poster-wrap">
+                        <img
+                          src={searchResult.poster}
+                          alt={searchResult.title}
+                          className="modal-poster-img"
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=800&q=80';
+                          }}
+                        />
+                      </div>
+
+                      <div className="modal-banner-info">
+                        {/* HÀNG CẢNH BÁO ĐỘ TUỔI */}
+                        {(() => {
+                          const ageBadge = getAgeRatingBadge(searchResult);
+                          const eligible = isAdvisoryEligible(searchResult);
+                          return ageBadge ? (
+                            <div className="modal-age-warning-row">
+                              <span 
+                                className={`age-code-tag age-code-${ageBadge.code.toLowerCase()} ${eligible ? 'clickable-age-tag' : ''}`}
+                                onClick={() => eligible && setIsAgeAdvisoryOpen(true)}
+                                title={eligible ? `${ageBadge.description || ageBadge.label} (Bấm xem chi tiết cảnh báo)` : (ageBadge.description || ageBadge.label)}
+                              >
+                                {ageBadge.code}
+                              </span>
+                              <span 
+                                className={`age-desc-tag age-desc-${ageBadge.code.toLowerCase()} ${eligible ? 'clickable-age-tag' : ''}`}
+                                onClick={() => eligible && setIsAgeAdvisoryOpen(true)}
+                                title={eligible ? `${ageBadge.description || ageBadge.label} (Bấm xem chi tiết cảnh báo)` : (ageBadge.description || ageBadge.label)}
+                              >
+                                {ageBadge.description || ageBadge.label}
+                              </span>
+                              {eligible && (
+                                <button
+                                  className="age-info-circle-btn"
+                                  onClick={() => setIsAgeAdvisoryOpen(true)}
+                                  title="Xem chi tiết số cảnh nóng, bạo lực, kinh dị & mốc thời gian"
+                                >
+                                  <Info size={14} className="age-info-icon" />
+                                </button>
+                              )}
+                            </div>
+                          ) : null;
+                        })()}
+
                         {(() => {
                           const aiTitles = resolveMovieTitles(searchResult);
                           return (
                             <>
-                              <h4 className="result-title">
+                              <h2 className="modal-movie-title">
                                 {aiTitles.vietnameseTitle}
-                              </h4>
+                              </h2>
                               {aiTitles.englishTitle && aiTitles.englishTitle !== aiTitles.vietnameseTitle && (
-                                <span className="result-sub-title">{aiTitles.englishTitle}</span>
+                                <h3 className="modal-movie-original">{aiTitles.englishTitle}</h3>
                               )}
                             </>
                           );
                         })()}
-                      </div>
 
-                      <div className="result-meta-line">
-                        <span className="result-year-badge">{searchResult.year}</span>
-                        <span>•</span>
-                        <span>{searchResult.runtime || 'N/A'}</span>
-                        {searchResult.director && searchResult.director !== 'N/A' && (
-                          <>
-                            <span>•</span>
-                            <span>Đạo diễn: {searchResult.director}</span>
-                          </>
-                        )}
-                      </div>
-
-                      {searchResult.genres && (
-                        <div className="result-genres-row">
-                          {searchResult.genres.map((g, i) => (
-                            <span key={i} className="result-genre-pill">{g}</span>
-                          ))}
+                        <div className="modal-meta-grid">
+                          {searchResult.year && <span><Calendar size={14} /> {searchResult.year}</span>}
+                          <span><Clock size={14} /> {searchResult.runtime && searchResult.runtime !== 'N/A' ? searchResult.runtime : 'Đang cập nhật'}</span>
                         </div>
-                      )}
+                      </div>
+                    </div>
 
-                      {/* COMPACT SCORES STRIP */}
-                      <div className="result-scores-row">
+                    {/* CỤM ĐIỂM SỐ 3 NGUỒN (BẢNG ĐIỂM NGUỒN UY TÍN) */}
+                    <div className="modal-scores-section">
+                      <h4 className="section-mini-title">Bảng Điểm Nguồn Uy Tín</h4>
+                      <div className="modal-scores-cluster">
                         <ScoreBadge
                           type="unified"
                           score={calculateUnifiedScore(searchResult.ratings)}
-                          size="small"
+                          size="large"
                         />
-                        <ScoreBadge
-                          type="imdb"
-                          score={searchResult.ratings?.imdb}
-                          votes={searchResult.ratings?.imdbVotes}
-                        />
-                        <ScoreBadge
-                          type="rtCritics"
-                          score={searchResult.ratings?.rtCritics}
-                        />
-                        <ScoreBadge
-                          type="rtAudience"
-                          score={searchResult.ratings?.rtAudience}
-                        />
-                        <ScoreBadge
-                          type="metacritic"
-                          score={searchResult.ratings?.metascore}
+                        <div className="modal-source-badges">
+                          <ScoreBadge
+                            type="imdb"
+                            score={searchResult.ratings?.imdb}
+                            votes={searchResult.ratings?.imdbVotes}
+                            showSubtitle={true}
+                          />
+                          <ScoreBadge
+                            type="rtCritics"
+                            score={searchResult.ratings?.rtCritics}
+                            showSubtitle={true}
+                          />
+                          <ScoreBadge
+                            type="rtAudience"
+                            score={searchResult.ratings?.rtAudience}
+                            showSubtitle={true}
+                          />
+                          <ScoreBadge
+                            type="metacritic"
+                            score={searchResult.ratings?.metascore}
+                            showSubtitle={true}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* KHU VỰC THÔNG TIN DIỄN VIÊN, ĐẠO DIỄN, HÃNG SẢN XUẤT VÀ QUỐC GIA (DƯỚI BẢNG ĐIỂM NGUỒN UY TÍN) */}
+                    {(() => {
+                      const credits = formatMovieCredits(searchResult);
+                      return (
+                        <div className="modal-credits-section">
+                          <div className="credit-row">
+                            <span className="credit-label">
+                              <Users size={14} className="credit-icon" /> Diễn viên:
+                            </span>
+                            <span className="credit-value">{credits.castWithRoles}</span>
+                          </div>
+
+                          <div className="credit-row">
+                            <span className="credit-label">
+                              <Film size={14} className="credit-icon" /> Đạo diễn & Ê-kíp:
+                            </span>
+                            <span className="credit-value">{credits.director}</span>
+                          </div>
+
+                          {credits.production && (
+                            <div className="credit-row">
+                              <span className="credit-label">
+                                <Building2 size={14} className="credit-icon" /> Hãng sản xuất:
+                              </span>
+                              <span className="credit-value">{credits.production}</span>
+                            </div>
+                          )}
+
+                          {searchResult.country && (
+                            <div className="credit-row">
+                              <span className="credit-label">
+                                <Globe size={14} className="credit-icon" /> Quốc gia:
+                              </span>
+                              <span className="credit-value">{searchResult.country}</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* GIỚI THIỆU PHIM (NETFLIX-STYLE) */}
+                    {searchResult.synopsis && (
+                      <div className="modal-quick-synopsis-box">
+                        <span className="quick-synopsis-tag">Giới thiệu phim:</span> {formatQuickSynopsis(searchResult.synopsis, 60)}
+                      </div>
+                    )}
+
+                    {/* THẺ PHÊ BÌNH PHIM (TỐI ĐA 200 TỪ) */}
+                    {(searchResult.filmReview || searchResult.movieReview) && (
+                      <div className="modal-film-review-card">
+                        <div className="film-review-header">
+                          <div className="film-review-title-wrap">
+                            <div className="film-review-icon-badge">
+                              <Sparkles size={16} />
+                            </div>
+                            <h4 className="film-review-heading">Phê bình phim</h4>
+                          </div>
+                          <span className="film-review-tag">Góc nhìn & Ý nghĩa</span>
+                        </div>
+                        <p className="film-review-body">
+                          {formatFilmReview(searchResult.filmReview || searchResult.movieReview || searchResult.criticConsensus, 200)}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* TÓM TẮT DIỄN BIẾN & GIỌNG ĐỌC AI */}
+                    {(searchResult.detailedPlot || searchResult.synopsis) && (
+                      <div className="modal-section synopsis-section">
+                        <AudioPlotReader
+                          text={formatDetailedPlot(searchResult.detailedPlot || searchResult.synopsis, 300)}
+                          title="Tóm tắt diễn biến"
+                          spoilerTag={searchResult.detailedPlot ? "Spoiler" : ""}
+                          defaultExpanded={false}
                         />
                       </div>
+                    )}
+
+                    {/* DÀN DIỄN VIÊN CHÍNH */}
+                    {Array.isArray(searchResult.cast) && searchResult.cast.length > 0 && (
+                      <div className="modal-cast-section">
+                        <h4 className="section-mini-title">Dàn Diễn Viên Chính</h4>
+                        <div className="cast-tags-list">
+                          {searchResult.cast.map((actor, idx) => (
+                            <span key={idx} className="cast-tag">{actor}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ACTION BUTTONS */}
+                    <div className="result-actions-footer">
+                      <button
+                        className="ai-btn-secondary"
+                        onClick={() => {
+                          setSearchResult(null);
+                          setError(null);
+                        }}
+                      >
+                        <Search size={15} /> Nhập Tên Phim Khác
+                      </button>
+                      <button className="ai-btn-primary" onClick={handleImport}>
+                        <Plus size={17} /> Thêm Vào Kho Phim & Xem Chi Tiết
+                      </button>
                     </div>
                   </div>
-
-                  {/* TÓM TẮT NHANH (NETFLIX-STYLE) */}
-                  {searchResult.synopsis && (
-                    <div className="result-consensus-box">
-                      <strong>Tóm tắt nhanh:</strong> {formatQuickSynopsis(searchResult.synopsis, 60)}
-                    </div>
-                  )}
-
-                  {/* THẺ PHÊ BÌNH PHIM (TỐI ĐA 200 TỪ) */}
-                  {(searchResult.filmReview || searchResult.criticConsensus) && (
-                    <div className="result-film-review-box">
-                      <div className="result-film-review-header">
-                        <div className="review-header-title">
-                          <Sparkles size={14} className="review-sparkle-icon" />
-                          <span>Phê bình phim</span>
-                        </div>
-                        <span className="review-tag">Góc nhìn & Ý nghĩa</span>
-                      </div>
-                      <p className="result-film-review-text">
-                        {formatFilmReview(searchResult.filmReview || searchResult.criticConsensus, 200)}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* AUDIO SPOILER PLOT READER */}
-                  {(searchResult.detailedPlot || searchResult.synopsis) && (
-                    <div className="result-plot-box">
-                      <AudioPlotReader
-                        text={searchResult.detailedPlot || searchResult.synopsis}
-                        title="Tóm tắt diễn biến"
-                        spoilerTag="Spoiler"
-                        defaultExpanded={false}
-                      />
-                    </div>
-                  )}
-                </div>
+                </>
               )}
-
-              {/* ACTION BUTTONS */}
-              <div className="result-actions-footer">
-                <button
-                  className="ai-btn-secondary"
-                  onClick={() => {
-                    setSearchResult(null);
-                    setError(null);
-                  }}
-                >
-                  <Search size={15} /> Tìm Phim Khác
-                </button>
-                <button className="ai-btn-primary" onClick={handleImport}>
-                  <Plus size={17} /> Thêm Vào Kho Phim & Xem Chi Tiết
-                </button>
-              </div>
             </div>
           </div>
         )}
@@ -514,6 +659,14 @@ export function AISearchModal({
           </button>
         </div>
       </div>
+
+      {/* MODAL CHI TIẾT PHÂN LOẠI ĐỘ TUỔI TỪ KẾT QUẢ TÌM KIẾM AI */}
+      {isAgeAdvisoryOpen && searchResult && (
+        <AgeRatingDetailModal
+          movie={searchResult}
+          onClose={() => setIsAgeAdvisoryOpen(false)}
+        />
+      )}
     </div>
   );
 }

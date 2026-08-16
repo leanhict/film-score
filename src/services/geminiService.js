@@ -102,7 +102,7 @@ Trả về duy nhất định dạng JSON (không dùng markdown codeblock, khô
   "backdrop": "URL ảnh banner",
   "trailerUrl": "URL trailer youtube chính thức hoặc link tìm kiếm",
   "synopsis": "Tóm tắt ngắn gọn KHÔNG SPOILER (tối đa 60 chữ) theo phong cách chú thích phim Netflix / rạp chiếu, giới thiệu tiền đề câu chuyện mà tuyệt đối không tiết lộ plot twist hay kết cục",
-  "detailedPlot": "Tóm tắt TOÀN BỘ cốt truyện từ đầu đến cuối ĐẦY ĐỦ TRỌN VẸN TRONG PHẠM VI TỐI ĐA 200 CHỮ (khoảng 130 - 180 từ tiếng Việt), tuyệt đối không dừng giữa chừng. Phải tóm lược mạch lạc 4 giai đoạn: 1. Mở đầu & bối cảnh -> 2. Diễn biến mâu thuẫn -> 3. Nút thắt / Biến cố cao trào -> 4. Kết cục trọn vẹn và số phận cuối cùng của các nhân vật chính.",
+  "detailedPlot": "Tóm tắt TOÀN BỘ cốt truyện từ đầu đến cuối ĐẦY ĐỦ TRỌN VẸN VÀ CHI TIẾT TRONG PHẠM VI TỐI ĐA 300 CHỮ (khoảng 220 - 280 từ tiếng Việt), tuyệt đối không dừng giữa chừng hay tóm tắt sơ sài. Phải tóm lược mạch lạc 4 giai đoạn: 1. Mở đầu & bối cảnh -> 2. Diễn biến mâu thuẫn -> 3. Nút thắt / Biến cố cao trào -> 4. Kết cục trọn vẹn và số phận cuối cùng của các nhân vật chính.",
   "filmReview": "Bài phê bình và nhận định phim chuyên sâu (tối đa 200 từ tiếng Việt): Nhận xét đánh giá tổng quan, phân tích những thông điệp và ý nghĩa nhân văn/nghệ thuật sâu sắc của tác phẩm, nêu bật các điểm tốt nổi trội (chỉ đạo đạo diễn, diễn xuất, kịch bản, âm nhạc, góc quay) và lý do phim xứng đáng thưởng thức.",
   "criticConsensus": "Nhận định tổng quan của giới phê bình bằng tiếng Việt phản ánh đúng mức điểm",
   "audienceSentiment": "Cảm nhận của khán giả đại chúng bằng tiếng Việt phản ánh đúng mức điểm",
@@ -116,7 +116,8 @@ Trả về duy nhất định dạng JSON (không dùng markdown codeblock, khô
   },
   "streaming": ["Apple TV+", "Netflix", "Galaxy Play"],
   "boxOffice": "Doanh thu phòng vé hoặc N/A",
-  "awards": "Giải thưởng hoặc N/A"
+  "awards": "Giải thưởng hoặc N/A",
+  "ageRating": "T18"
 }
 `;
 
@@ -159,7 +160,7 @@ Trả về duy nhất định dạng JSON (không dùng markdown codeblock, khô
     englishTitle: resolved.englishTitle || parsed.title,
     vietnameseTitle: resolved.vietnameseTitle || parsed.vietnameseTitle || parsed.title,
     synopsis: formatQuickSynopsis(parsed.synopsis, 60),
-    detailedPlot: formatDetailedPlot(parsed.detailedPlot, 200),
+    detailedPlot: formatDetailedPlot(parsed.detailedPlot, 300),
     filmReview: formatFilmReview(parsed.filmReview, 200),
     id: `ai-gemini-${Date.now()}`,
     candidates: [],

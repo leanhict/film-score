@@ -5,7 +5,16 @@
  */
 
 import { getStoredGeminiKey } from './geminiService.js';
-import { VIETNAMESE_TITLE_MAP, removeVietnameseTones, normalizeSearchString, formatQuickSynopsis, formatDetailedPlot, formatFilmReview, parseYearToNumber } from '../utils/searchUtils.js';
+import { 
+  VIETNAMESE_TITLE_MAP, 
+  removeVietnameseTones, 
+  normalizeSearchString, 
+  formatQuickSynopsis, 
+  formatDetailedPlot, 
+  formatFilmReview, 
+  parseYearToNumber,
+  calculateRelevance 
+} from '../utils/searchUtils.js';
 import { resolveMovieTitles } from '../utils/movieTitleResolver.js';
 
 // Danh sách các API keys dự phòng cho OMDb
@@ -129,27 +138,32 @@ export async function translateToVietnamese(text) {
  * Trích xuất phần cốt truyện chi tiết (Plot / Premise / Synopsis) từ kho dữ liệu Wikipedia
  */
 /**
- * Rút gọn các câu trong cốt truyện dài thành một diễn biến trọn vẹn từ mở đầu, biến cố, cao trào đến kết thúc
+ * Rút gọn các câu trong cốt truyện dài thành một diễn biến phong phú, chi tiết và trọn vẹn
+ * từ mở đầu, biến cố, cao trào đến kết thúc (tối đa 300 từ)
  */
 function condensePlotText(text) {
   if (!text) return '';
   const clean = text.replace(/\s+/g, ' ').trim();
   const sentences = clean.match(/(?:[^.!?]|(?:\b[A-Za-z]\.))+[.!?]+/g) || [clean];
-  if (sentences.length <= 5) return clean;
+  if (sentences.length <= 8) return clean;
 
   const n = sentences.length;
+  // Lấy 8 phân đoạn xuyên suốt mạch phim để tóm tắt đầy đủ, sâu sắc
   const s1 = sentences[0]; // Mở đầu & bối cảnh
-  const s2 = sentences[Math.floor(n * 0.25)]; // Khởi phát biến cố
-  const s3 = sentences[Math.floor(n * 0.55)]; // Bước ngoặt / Nút thắt
-  const s4 = sentences[Math.floor(n * 0.8)]; // Cao trào xung đột
-  const s5 = sentences[n - 1]; // Kết cục trọn vẹn
+  const s2 = sentences[1]; // Thiết lập nhân vật
+  const s3 = sentences[Math.floor(n * 0.25)]; // Khởi phát biến cố
+  const s4 = sentences[Math.floor(n * 0.45)]; // Phát triển xung đột
+  const s5 = sentences[Math.floor(n * 0.65)]; // Bước ngoặt / Nút thắt
+  const s6 = sentences[Math.floor(n * 0.8)]; // Cao trào xung đột
+  const s7 = sentences[Math.floor(n * 0.9)]; // Giải quyết biến cố
+  const s8 = sentences[n - 1]; // Kết cục trọn vẹn
 
-  return [s1, s2, s3, s4, s5].filter(Boolean).map(s => s.trim()).join(' ');
+  return [s1, s2, s3, s4, s5, s6, s7, s8].filter(Boolean).map(s => s.trim()).join(' ');
 }
 
 /**
  * Trích xuất phần cốt truyện đầy đủ (Mở đầu -> Biến cố -> Cao trào -> Kết cục) từ Wikipedia tiếng Việt hoặc tiếng Anh
- * Giới hạn tối đa trong phạm vi 200 chữ
+ * Giới hạn tối đa trong phạm vi 300 chữ
  */
 export async function fetchWikipediaPlot(title, year = '', vietnameseTitle = '') {
   // 1. Ưu tiên tra cứu trên Wikipedia tiếng Việt (vi.wikipedia.org)
@@ -178,7 +192,7 @@ export async function fetchWikipediaPlot(title, year = '', vietnameseTitle = '')
               if (plotMatch && plotMatch[1].trim().length > 100) {
                 const condensed = condensePlotText(plotMatch[1].trim());
                 if (condensed && condensed.length > 80) {
-                  return formatDetailedPlot(condensed, 200);
+                  return formatDetailedPlot(condensed, 300);
                 }
               }
             }
@@ -221,7 +235,7 @@ export async function fetchWikipediaPlot(title, year = '', vietnameseTitle = '')
             const condensedEn = condensePlotText(plotMatch[1].trim());
             const viTranslated = await translateToVietnamese(condensedEn);
             if (viTranslated && viTranslated.length > 60) {
-              return formatDetailedPlot(viTranslated, 200);
+              return formatDetailedPlot(viTranslated, 300);
             }
           }
         }
@@ -234,7 +248,7 @@ export async function fetchWikipediaPlot(title, year = '', vietnameseTitle = '')
 }
 
 /**
- * Xây dựng đoạn tóm tắt nội dung diễn biến cụ thể đầy đủ 4 giai đoạn (tối đa 200 từ)
+ * Xây dựng đoạn tóm tắt nội dung diễn biến chi tiết đầy đủ 4 giai đoạn mạch lạc (tối đa 300 từ)
  */
 export function buildVietnameseDetailedPlot(title, year, genres, director, cast, viSynopsis) {
   const genreStr = Array.isArray(genres) ? genres.join(', ') : (genres || 'Điện ảnh');
@@ -242,12 +256,12 @@ export function buildVietnameseDetailedPlot(title, year, genres, director, cast,
 
   let plotText = '';
   if (viSynopsis && viSynopsis.length > 30) {
-    plotText = `${viSynopsis} Câu chuyện mở đầu với ${castStr} khi họ phải đối mặt với những thử thách lớn và mâu thuẫn khôn lường. Mọi chuyện dần trở nên phức tạp khi những bí mật bị che giấu dần hé lộ, đẩy câu chuyện vào hàng loạt biến cố gay cấn và các cú plot twist bất ngờ. Trong giai đoạn cao trào, các nhân vật buộc phải đưa ra những quyết định mang tính sinh tử. Toàn bộ xung đột cuối cùng được giải quyết sau những bước ngoặt kịch tính, định đoạt số phận của các nhân vật.`;
+    plotText = `${viSynopsis} Mạch phim mở đầu với sự xuất hiện của ${castStr} khi họ bị cuốn vào vòng xoáy của những thử thách và mâu thuẫn phức tạp. Khi cốt truyện tiến triển, hàng loạt bí mật ẩn giấu cùng những toan tính ngầm dần được phơi bày ra ánh sáng, đẩy mối quan hệ giữa các bên vào thế đối đầu căng thẳng tột độ. Bước ngoặt lớn xảy ra khi một biến cố bất ngờ làm đảo lộn toàn bộ cục diện, buộc các nhân vật phải đưa ra những lựa chọn mang tính quyết định số phận. Trong phân đoạn cao trào nghẹt thở, sự thật trần trụi được lật mở và các nút thắt gay cấn được giải quyết dứt điểm, khép lại hành trình đầy thăng trầm và định đoạt kết cục cuối cùng của từng nhân vật.`;
   } else {
-    plotText = `Bộ phim "${title}" (${year}) thuộc thể loại ${genreStr}. Câu chuyện mở đầu khi ${castStr} đối mặt với những biến cố lớn trong cuộc sống. Các tình tiết được đẩy lên cao trào khi những nút thắt và bí mật dần được phơi bày, kéo theo hàng loạt xung đột không thể hàn gắn. Cuối cùng, sau những bước ngoặt đầy thử thách, số phận của các nhân vật chính được định đoạt, khép lại câu chuyện với nhiều cảm xúc và suy ngẫm sâu sắc.`;
+    plotText = `Bộ phim "${title}" (${year}) thuộc thể loại ${genreStr} dưới sự chỉ đạo của đạo diễn ${director || 'tài năng'}. Câu chuyện mở đầu khi ${castStr} phải đối mặt với những biến cố lớn và thử thách cam go. Xung đột dần được đẩy lên đỉnh điểm khi những toan tính và khúc mắc kéo theo chuỗi biến cố dồn dập không thể kiểm soát. Tại hồi cao trào, các nhân vật bước vào trận chiến quyết định thử thách giới hạn thể xác lẫn tâm lý. Cuối cùng, sau những bước ngoặt mang tính bước ngoặt, toàn bộ mâu thuẫn được giải tỏa trọn vẹn, để lại cái kết giàu cảm xúc và suy ngẫm sâu sắc về số phận con người.`;
   }
 
-  return formatDetailedPlot(plotText, 200);
+  return formatDetailedPlot(plotText, 300);
 }
 
 // Danh sách các API keys dự phòng cho TMDB (Tra cứu phim Việt Nam & Quốc tế thời gian thực)
@@ -259,97 +273,6 @@ const TMDB_API_KEYS = [
 
 function getTmdbKey() {
   return TMDB_API_KEYS[Math.floor(Math.random() * TMDB_API_KEYS.length)];
-}
-
-/**
- * Tính điểm mức độ liên quan (Relevance Score) giữa kết quả và từ khóa tìm kiếm
- * Đảm bảo loại bỏ hoàn toàn các phim không liên quan (điểm = 0)
- */
-function calculateRelevance(cand, rawQuery, targetYear, searchTitles = []) {
-  let score = 0;
-  const qClean = rawQuery.trim().toLowerCase();
-  const qNorm = normalizeSearchString(rawQuery);
-  
-  const titleRaw = (cand.title || '').trim().toLowerCase();
-  const titleNorm = normalizeSearchString(cand.title || '');
-  const viTitleRaw = (cand.vietnameseTitle || '').trim().toLowerCase();
-  const viTitleNorm = normalizeSearchString(cand.vietnameseTitle || '');
-  const enTitleRaw = (cand.englishTitle || '').trim().toLowerCase();
-  const enTitleNorm = normalizeSearchString(cand.englishTitle || '');
-  const origTitleRaw = (cand.originalTitle || '').trim().toLowerCase();
-  const origTitleNorm = normalizeSearchString(cand.originalTitle || '');
-
-  const candidateTitleVariants = [
-    titleRaw, titleNorm, viTitleRaw, viTitleNorm, enTitleRaw, enTitleNorm, origTitleRaw, origTitleNorm
-  ].filter(Boolean);
-
-  const allSearchQueries = [qClean, qNorm, ...searchTitles.map(s => s.toLowerCase()), ...searchTitles.map(s => normalizeSearchString(s))].filter(Boolean);
-
-  // 1. Khớp chính xác hoàn toàn (Exact full match)
-  const isExactMatch = allSearchQueries.some(sq => 
-    candidateTitleVariants.some(tv => tv === sq)
-  );
-
-  if (isExactMatch) {
-    score += 40000;
-  }
-  // 2. Bắt đầu bằng từ khóa (Starts with query)
-  else if (allSearchQueries.some(sq => sq.length > 2 && candidateTitleVariants.some(tv => tv.startsWith(sq) || tv.startsWith(sq + ':') || tv.startsWith(sq + ' -')))) {
-    score += 25000;
-  }
-  // 3. Chứa toàn bộ chuỗi từ khóa (Contains query substring)
-  else if (allSearchQueries.some(sq => sq.length > 2 && candidateTitleVariants.some(tv => tv.includes(sq)))) {
-    score += 15000;
-  }
-  // 4. Khớp theo từng từ đơn lẻ (Word-by-word matching)
-  else {
-    const qWords = qNorm.split(' ').filter(w => w.length > 1);
-    if (qWords.length > 1) {
-      let matchedCount = 0;
-      for (const w of qWords) {
-        // Phải khớp CHÍNH XÁC theo từ (word boundary), không khớp substring lỏng lẻo
-        if (candidateTitleVariants.some(tv => tv.split(' ').includes(w))) {
-          matchedCount++;
-        }
-      }
-      // Bắt buộc khớp TẤT CẢ các từ trong query mới tính là liên quan
-      if (matchedCount === qWords.length) {
-        score += 12000;
-      } else {
-        // Thiếu bất kỳ từ nào -> loại bỏ hoàn toàn
-        return 0;
-      }
-    } else if (qWords.length === 1) {
-      const singleWord = qWords[0];
-      // Từ đơn: phải khớp chính xác theo word boundary
-      if (candidateTitleVariants.some(tv => tv.split(' ').includes(singleWord))) {
-        score += 5000;
-      }
-    }
-  }
-
-  // NẾU HOÀN TOÀN KHÔNG CÓ BẤT KỲ TỪ NÀO TRÙNG KHỚP -> TRẢ VỀ 0
-  if (score === 0) {
-    return 0;
-  }
-
-  // 5. Thưởng thêm nếu có điểm bình chọn và độ phổ biến
-  if (cand.voteCount) {
-    score += Math.min(1000, Math.log10(cand.voteCount + 1) * 200);
-  }
-  if (cand.rank && cand.rank < 5000) {
-    score += Math.max(0, 500 - cand.rank / 10);
-  }
-
-  // 6. Khớp năm (chỉ thưởng khi người dùng chỉ định năm cụ thể)
-  if (targetYear && cand.year) {
-    if (parseInt(cand.year, 10) === targetYear) {
-      score += 8000;
-    }
-  }
-  // Không thưởng bonus năm khi không có targetYear để tránh đẩy phim mới ít liên quan lên đầu
-
-  return score;
 }
 
 /**
@@ -420,13 +343,13 @@ export async function fetchNetflixStyleSynopsis(title, year = '', imdbId = '', t
  * Tự động nhận diện chuẩn xác phim Điện ảnh, Series / Phim truyền hình Netflix và phim Quốc tế
  */
 export async function searchMovieCandidates(rawQuery) {
-  const query = rawQuery.trim();
-  if (!query) return [];
+  const cleanRaw = String(rawQuery || '').replace(/["'“”‘’]/g, '').trim();
+  if (!cleanRaw) return [];
 
   // Tách năm nếu người dùng gõ kèm năm (ví dụ: "Thanh Sói 2022", "Avatar 2 2022")
-  const yearMatch = query.match(/\b(19\d\d|20\d\d)\b/);
+  const yearMatch = cleanRaw.match(/\b(19\d\d|20\d\d)\b/);
   const targetYear = yearMatch ? parseInt(yearMatch[1], 10) : null;
-  const cleanTitle = query.replace(/\b(19\d\d|20\d\d)\b/g, '').replace(/[()]/g, '').trim();
+  const cleanTitle = cleanRaw.replace(/\b(19\d\d|20\d\d)\b/g, '').replace(/[()]/g, '').trim();
 
   const searchTitles = [cleanTitle];
 
@@ -483,7 +406,7 @@ export async function searchMovieCandidates(rawQuery) {
               vietnameseTitle: vietnameseTitle || titleVI,
               englishTitle: englishTitle || titleOriginal || titleVI,
               originalTitle: titleOriginal || titleVI,
-              year: m.release_date ? new Date(m.release_date).getFullYear() : (m.first_air_date ? new Date(m.first_air_date).getFullYear() : null),
+              year: m.release_date ? parseYearToNumber(m.release_date) : (m.first_air_date ? parseYearToNumber(m.first_air_date) : null),
               poster: m.poster_path ? `https://image.tmdb.org/t/p/w342${m.poster_path}` : null,
               backdrop: m.backdrop_path ? `https://image.tmdb.org/t/p/w1280${m.backdrop_path}` : null,
               imdbRating: null, // Sẽ được cập nhật chính xác từ IMDb/OMDb
@@ -510,7 +433,7 @@ export async function searchMovieCandidates(rawQuery) {
         if (Array.isArray(data.d)) {
           for (const item of data.d) {
             if (item.id && item.id.startsWith('tt') && (item.qid === 'movie' || item.qid === 'tvSeries' || item.qid === 'tvMiniSeries' || item.q === 'feature' || !item.qid)) {
-              const y = item.y || (item.tl ? parseInt(item.tl, 10) : null);
+              const y = item.y || (item.tl ? parseYearToNumber(item.tl) : null);
               const { vietnameseTitle, englishTitle } = resolveMovieTitles({ title: item.l, originalTitle: item.l });
               
               candidatesMap.set(item.id, {
@@ -558,7 +481,7 @@ export async function searchMovieCandidates(rawQuery) {
                 vietnameseTitle: vietnameseTitle || item.Title,
                 englishTitle: englishTitle || item.Title,
                 originalTitle: item.Title,
-                year: parseInt(item.Year, 10) || null,
+                year: item.Year ? parseYearToNumber(item.Year) : null,
                 cast: '',
                 poster: item.Poster !== 'N/A' ? item.Poster : null,
                 imdbRating: null,
@@ -574,30 +497,31 @@ export async function searchMovieCandidates(rawQuery) {
   // 4. TÍNH ĐIỂM LIÊN QUAN VÀ LOẠI BỎ CÁC PHIM KHÔNG LIÊN QUAN
   let list = Array.from(candidatesMap.values());
   list.forEach(cand => {
-    cand.relevanceScore = calculateRelevance(cand, query, targetYear, searchTitles);
+    cand.relevanceScore = calculateRelevance(cand, cleanRaw, targetYear, searchTitles);
   });
 
   // Chỉ giữ lại những tác phẩm THỰC SỰ liên quan đến từ khóa tìm kiếm (ngưỡng tối thiểu 8000)
   const minThreshold = 8000;
   list = list.filter(cand => (cand.relevanceScore || 0) >= minThreshold);
 
-  // Sắp xếp danh sách ứng viên sơ bộ:
+  // Sắp xếp danh sách ứng viên sơ bộ theo ĐỘ LIÊN QUAN & KHỚP TÊN:
   list.sort((a, b) => {
-    if (targetYear) {
-      const aMatchesTarget = parseYearToNumber(a.year) === targetYear;
-      const bMatchesTarget = parseYearToNumber(b.year) === targetYear;
-      if (aMatchesTarget && !bMatchesTarget) return -1;
-      if (!aMatchesTarget && bMatchesTarget) return 1;
+    const scoreA = a.relevanceScore || 0;
+    const scoreB = b.relevanceScore || 0;
+    if (scoreB !== scoreA) {
+      return scoreB - scoreA;
+    }
+    const rateA = parseFloat(a.imdbRating) || 0;
+    const rateB = parseFloat(b.imdbRating) || 0;
+    if (rateB !== rateA) {
+      return rateB - rateA;
     }
     const yearA = parseYearToNumber(a.year);
     const yearB = parseYearToNumber(b.year);
-    if (yearB !== yearA) {
-      return yearB - yearA;
-    }
-    return (b.relevanceScore || 0) - (a.relevanceScore || 0);
+    return yearB - yearA;
   });
 
-  // 5. ĐỒNG BỘ ĐIỂM SỐ IMDB CHÍNH XÁC 100% TỪ OMDB CHO CÁC ỨNG VIÊN
+  // 5. ĐỒNG BỘ ĐIỂM SỐ IMDB VÀ NĂM CHÍNH XÁC 100% TỪ OMDB CHO CÁC ỨNG VIÊN
   const topCandidates = list.slice(0, 10);
   const activeOmdbKey = userKey || 'trilogy';
   await Promise.allSettled(
@@ -626,7 +550,10 @@ export async function searchMovieCandidates(rawQuery) {
               }
               if (!cand.poster && d.Poster !== 'N/A') cand.poster = d.Poster;
               if (!cand.cast && d.Actors !== 'N/A') cand.cast = d.Actors;
-              if (d.Year && !cand.year) cand.year = parseInt(d.Year, 10);
+              if (d.Year && d.Year !== 'N/A') {
+                const verifiedYear = parseYearToNumber(d.Year);
+                if (verifiedYear > 0) cand.year = verifiedYear;
+              }
             }
           }
         }
@@ -638,6 +565,11 @@ export async function searchMovieCandidates(rawQuery) {
       } catch (e) {}
     })
   );
+
+  // Cập nhật lại relevanceScore sau khi đã đồng bộ thông tin chính xác từ OMDb
+  list.forEach(cand => {
+    cand.relevanceScore = calculateRelevance(cand, cleanRaw, targetYear, searchTitles);
+  });
 
   // Khử trùng lặp theo imdbID hoặc tên + năm để không xuất hiện 2 thẻ cùng một phim
   const seenKeys = new Set();
@@ -665,25 +597,21 @@ export async function searchMovieCandidates(rawQuery) {
   const rawFinalList = qualityList.length > 0 ? qualityList : dedupedList.filter(c => !!c.poster);
   const finalList = rawFinalList.length > 0 ? rawFinalList : dedupedList;
 
-  // ĐẢM BẢO DANH SÁCH CUỐI CÙNG LUÔN ĐƯỢC SẮP XẾP THEO NĂM SẢN XUẤT GIẢM DẦN (MỚI NHẤT LÊN ĐẦU)
+  // ĐẢM BẢO DANH SÁCH CUỐI CÙNG LUÔN ĐƯỢC SẮP XẾP THEO ĐỘ KHỚP TÊN & LIÊN QUAN (TRÙNG TÊN LÊN ĐẦU)
   finalList.sort((a, b) => {
-    if (targetYear) {
-      const aMatchesTarget = parseYearToNumber(a.year) === targetYear;
-      const bMatchesTarget = parseYearToNumber(b.year) === targetYear;
-      if (aMatchesTarget && !bMatchesTarget) return -1;
-      if (!aMatchesTarget && bMatchesTarget) return 1;
-    }
-    const yearA = parseYearToNumber(a.year);
-    const yearB = parseYearToNumber(b.year);
-    if (yearB !== yearA) {
-      return yearB - yearA;
+    const scoreA = a.relevanceScore || 0;
+    const scoreB = b.relevanceScore || 0;
+    if (scoreB !== scoreA) {
+      return scoreB - scoreA;
     }
     const rateA = parseFloat(a.imdbRating) || 0;
     const rateB = parseFloat(b.imdbRating) || 0;
     if (rateB !== rateA) {
       return rateB - rateA;
     }
-    return (b.relevanceScore || 0) - (a.relevanceScore || 0);
+    const yearA = parseYearToNumber(a.year);
+    const yearB = parseYearToNumber(b.year);
+    return yearB - yearA;
   });
 
   return finalList.slice(0, 8);
@@ -740,9 +668,15 @@ async function fetchMovieFromTmdb(tmdbId, imdbIdOverride = null, preferredMediaT
     }
   }
 
-  const year = m.release_date
-    ? new Date(m.release_date).getFullYear()
-    : (m.first_air_date ? new Date(m.first_air_date).getFullYear() : 2024);
+  const tmdbYear = m.release_date
+    ? parseYearToNumber(m.release_date)
+    : (m.first_air_date ? parseYearToNumber(m.first_air_date) : null);
+
+  const omdbYear = realOmdbData?.Year && realOmdbData.Year !== 'N/A'
+    ? parseYearToNumber(realOmdbData.Year)
+    : null;
+
+  const year = omdbYear || tmdbYear || new Date().getFullYear();
   const voteAvg = m.vote_average || 7.0;
   const voteCount = m.vote_count || 100;
 
@@ -1007,6 +941,40 @@ export async function fetchLiveMovieRatings(query, year = '') {
     movieDetails.backdrop = bestCandidate.poster;
   }
 
+  // Đồng bộ năm sản xuất và điểm số chính xác từ movieDetails sang candidates
+  if (movieDetails && movieDetails.year) {
+    const verifiedYear = parseYearToNumber(movieDetails.year);
+    if (verifiedYear > 0) {
+      bestCandidate.year = verifiedYear;
+      candidates.forEach(c => {
+        if (c.imdbID === movieDetails.id || (c.externalImdbId && c.externalImdbId === movieDetails.id)) {
+          c.year = verifiedYear;
+          if (movieDetails.ratings?.imdb) c.imdbRating = movieDetails.ratings.imdb;
+        }
+      });
+    }
+  }
+
+  // Đảm bảo danh sách ứng viên được sắp xếp lại chuẩn xác theo độ khớp tên & liên quan sau khi đã đồng bộ
+  candidates.forEach(c => {
+    c.relevanceScore = calculateRelevance(c, query);
+  });
+  candidates.sort((a, b) => {
+    const scoreA = a.relevanceScore || 0;
+    const scoreB = b.relevanceScore || 0;
+    if (scoreB !== scoreA) {
+      return scoreB - scoreA;
+    }
+    const rateA = parseFloat(a.imdbRating) || 0;
+    const rateB = parseFloat(b.imdbRating) || 0;
+    if (rateB !== rateA) {
+      return rateB - rateA;
+    }
+    const yearA = parseYearToNumber(a.year);
+    const yearB = parseYearToNumber(b.year);
+    return yearB - yearA;
+  });
+
   return {
     movie: movieDetails,
     candidates: candidates.slice(0, 8)
@@ -1088,7 +1056,7 @@ async function parseOmdbData(data) {
   const backdrop = tmdbBackdrop || poster;
 
   const genres = translateGenres(data.Genre);
-  const yearNum = parseInt(data.Year, 10) || new Date().getFullYear();
+  const yearNum = parseYearToNumber(data.Year) || new Date().getFullYear();
   let runtimeFormatted = '110 phút';
   if (data.totalSeasons) {
     runtimeFormatted = `${data.totalSeasons} Mùa${data.Runtime && data.Runtime !== 'N/A' ? ` (${data.Runtime.replace('min', 'phút/tập')})` : ''}`;
@@ -1134,7 +1102,7 @@ async function parseOmdbData(data) {
   // Nếu không có Wikipedia, dùng bản OMDb full plot
   if (!detailedPlot && data.Plot && data.Plot !== 'N/A') {
     const translated = await translateToVietnamese(data.Plot);
-    detailedPlot = formatDetailedPlot(translated, 200);
+    detailedPlot = formatDetailedPlot(translated, 300);
   }
 
   // Nếu vẫn chưa có, xây dựng tóm tắt diễn biến đầy đủ
@@ -1287,7 +1255,7 @@ YÊU CẦU CỰC KỲ QUAN TRỌNG VỀ TÊN PHIM, TÓM TẮT VÀ PHÊ BÌNH:
 1. "vietnameseTitle": Tên phim tiếng Việt chính thức tại rạp/nền tảng chiếu hoặc dịch chuẩn nghĩa tự nhiên (VD: "Kỵ Sĩ Bóng Đêm", "Vùng Đất Linh Hồn", "Ký Sinh Trùng", "Hố Đen Tử Thần", "Kẻ Thu Nợ: Trả Thù").
 2. "englishTitle": Tên phim tiếng Anh chuẩn quốc tế.
 3. "synopsis": Tóm tắt giới thiệu tiền đề phim ngắn gọn KHÔNG SPOILER (TỐI ĐA 60 CHỮ) theo phong cách chú thích phim Netflix / rạp chiếu, giới thiệu bối cảnh và mâu thuẫn mở đầu mà tuyệt đối KHÔNG tiết lộ plot twist, bước ngoặt hay cái kết.
-4. "detailedPlot": Tóm tắt TOÀN BỘ cốt truyện từ đầu đến cuối ĐẦY ĐỦ TRỌN VẸN TRONG PHẠM VI TỐI ĐA 200 CHỮ (khoảng 130 - 180 từ tiếng Việt), tuyệt đối KHÔNG dừng giữa chừng hay chỉ kể phần mở đầu. Phải tóm lược mạch lạc 4 giai đoạn: 1. Mở đầu & bối cảnh -> 2. Diễn biến mâu thuẫn -> 3. Nút thắt / Biến cố cao trào -> 4. Kết cục trọn vẹn và số phận cuối cùng của các nhân vật chính.
+4. "detailedPlot": Tóm tắt TOÀN BỘ cốt truyện từ đầu đến cuối ĐẦY ĐỦ TRỌN VẸN VÀ CHI TIẾT TRONG PHẠM VI TỐI ĐA 300 CHỮ (khoảng 220 - 280 từ tiếng Việt), tuyệt đối KHÔNG dừng giữa chừng hay tóm tắt sơ sài. Phải tóm lược mạch lạc 4 giai đoạn: 1. Mở đầu & bối cảnh -> 2. Diễn biến mâu thuẫn -> 3. Nút thắt / Biến cố cao trào -> 4. Kết cục trọn vẹn và số phận cuối cùng của các nhân vật chính.
 5. "filmReview": Bài phê bình và nhận định phim chuyên sâu (TỐI ĐA 200 TỪ TIẾNG VIỆT): Đánh giá tổng quan tác phẩm, phân tích những thông điệp và ý nghĩa nhân văn/nghệ thuật sâu sắc của bộ phim, nêu bật các điểm tốt nổi trội (chỉ đạo đạo diễn, diễn xuất, kịch bản, âm nhạc, góc quay) và lý do phim xứng đáng thưởng thức.
 6. "criticConsensus": Nhận định phê bình tiếng Việt phản ánh đúng mức điểm thực tế.
 7. "audienceSentiment": Cảm nhận khán giả tiếng Việt phản ánh đúng mức điểm thực tế.
@@ -1297,7 +1265,7 @@ Trả về duy nhất chuỗi JSON hợp lệ (không kèm markdown format):
   "vietnameseTitle": "Tên tiếng Việt chính thức hoặc dịch chuẩn",
   "englishTitle": "Tên tiếng Anh chuẩn quốc tế",
   "synopsis": "Tóm tắt ngắn gọn KHÔNG SPOILER tối đa 60 chữ phong cách Netflix",
-  "detailedPlot": "Tóm tắt toàn bộ cốt truyện đầy đủ trọn vẹn từ đầu đến kết cục (tối đa 200 chữ)",
+  "detailedPlot": "Tóm tắt toàn bộ cốt truyện đầy đủ chi tiết trọn vẹn từ đầu đến kết cục (tối đa 300 chữ)",
   "filmReview": "Bài phê bình và nhận định phim chuyên sâu, nêu bật ý nghĩa và điểm tốt nổi bật (tối đa 200 chữ)",
   "criticConsensus": "Nhận định phê bình tiếng Việt",
   "audienceSentiment": "Cảm nhận khán giả tiếng Việt"
@@ -1339,7 +1307,7 @@ Trả về duy nhất chuỗi JSON hợp lệ (không kèm markdown format):
           englishTitle: resolved.englishTitle || movieData.title,
           vietnameseTitle: resolved.vietnameseTitle || movieData.vietnameseTitle,
           synopsis: formatQuickSynopsis(enhanced.synopsis || movieData.synopsis, 60),
-          detailedPlot: formatDetailedPlot(enhanced.detailedPlot || movieData.detailedPlot, 200),
+          detailedPlot: formatDetailedPlot(enhanced.detailedPlot || movieData.detailedPlot, 300),
           filmReview: enhanced.filmReview 
             ? formatFilmReview(enhanced.filmReview, 200) 
             : generateFallbackFilmReview({ ...movieData, ...enhanced }),

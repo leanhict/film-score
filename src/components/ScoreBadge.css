@@ -114,6 +114,14 @@
   padding: 6px 12px;
 }
 
+.score-badge-na {
+  opacity: 0.85;
+}
+
+.score-badge-na .score-main {
+  color: var(--text-muted);
+}
+
 .source-name {
   font-size: 0.72rem;
   color: var(--text-secondary);

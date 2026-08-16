@@ -1,6 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { calculateUnifiedScore, getMovieBadge, getScoreColor } from '../services/scoreEngine';
 import { resolveMovieTitles } from '../utils/movieTitleResolver';
+import { getAgeRatingBadge } from '../utils/searchUtils';
+import { isAdvisoryEligible } from '../utils/ageRatingAdvisory';
+import { AgeRatingDetailModal } from './AgeRatingDetailModal';
 import { Bookmark, Play, Eye, Star, Info } from 'lucide-react';
 import './MovieCard.css';
 
@@ -14,6 +17,7 @@ export function MovieCard({
   isWatched = false,
   onToggleWatched
 }) {
+  const [isAgeModalOpen, setIsAgeModalOpen] = useState(false);
   const unifiedScore = calculateUnifiedScore(movie.ratings, weights);
   const badge = getMovieBadge(movie.ratings, movie.id?.includes('gem') || movie.id?.includes('past-lives') || movie.id?.includes('monster'));
   const scoreColor = getScoreColor(unifiedScore);
@@ -91,6 +95,31 @@ export function MovieCard({
             </span>
           )}
 
+          {/* NHÃN ĐỘ TUỔI TƯƠNG TÁC */}
+          {(() => {
+            const ageBadge = getAgeRatingBadge(movie);
+            if (!ageBadge) return null;
+            const eligible = isAdvisoryEligible(movie);
+            return (
+              <>
+                <span className="meta-dot">•</span>
+                <span 
+                  className={`card-age-tag card-age-${ageBadge.code.toLowerCase()} ${eligible ? 'clickable-card-age' : ''}`}
+                  title={eligible ? `${ageBadge.description || ageBadge.label} (Bấm xem mốc thời gian cảnh báo)` : (ageBadge.description || ageBadge.label)}
+                  onClick={(e) => {
+                    if (eligible) {
+                      e.stopPropagation();
+                      setIsAgeModalOpen(true);
+                    }
+                  }}
+                >
+                  {ageBadge.code}
+                  {eligible && <Info size={10} className="card-age-info-icon" />}
+                </span>
+              </>
+            );
+          })()}
+
           {movie.country === 'Việt Nam' && (
             <>
               <span className="meta-dot">•</span>
@@ -155,6 +184,14 @@ export function MovieCard({
           </div>
         </div>
       </div>
+
+      {/* MODAL PHÂN TÍCH ĐỘ TUỔI TỪ THẺ PHIM */}
+      {isAgeModalOpen && (
+        <AgeRatingDetailModal
+          movie={movie}
+          onClose={() => setIsAgeModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

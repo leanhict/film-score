@@ -507,6 +507,35 @@
   gap: 12px;
 }
 
+.ai-movie-detail-card {
+  padding: 0 !important;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  position: relative;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+}
+
+.modal-source-pill-overlay {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: rgba(13, 16, 25, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(99, 102, 241, 0.4);
+  color: var(--accent-cyan);
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: var(--radius-full);
+  z-index: 10;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+}
+
 .result-top-info-strip {
   display: flex;
   align-items: center;
@@ -691,9 +720,10 @@
 .result-actions-footer {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
-  padding-top: 12px;
+  gap: 12px;
+  padding-top: 16px;
   border-top: 1px solid var(--border-subtle);
+  margin-top: 8px;
 }
 
 .ai-btn-secondary {

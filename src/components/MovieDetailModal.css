@@ -20,6 +20,57 @@
   z-index: 20;
 }
 
+/* TOP LEFT GROUP ON HERO BANNER (KIỆT TÁC ĐIỆN ẢNH + THỂ LOẠI) */
+.modal-top-left-group {
+  position: absolute;
+  top: 16px;
+  left: 20px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  pointer-events: none;
+  max-width: calc(100% - 110px);
+}
+
+.modal-top-left-badge {
+  display: flex;
+  align-items: center;
+}
+
+.modal-top-left-badge .badge {
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.modal-banner-genres {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.banner-genre-pill {
+  font-size: 0.76rem;
+  font-weight: 600;
+  background: rgba(13, 17, 26, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+  line-height: 1.2;
+  letter-spacing: 0.2px;
+}
+
 .modal-action-btn {
   width: 38px;
   height: 38px;
@@ -102,8 +153,8 @@
 /* HEADER INFO SECTION (PULLED DOWN WITH OVERLAPPING POSTER) */
 .modal-header-info-wrap {
   display: flex;
-  gap: 24px;
-  align-items: flex-end;
+  gap: 20px;
+  align-items: flex-start;
   margin-top: -75px;
   position: relative;
   z-index: 5;
@@ -130,12 +181,14 @@
   gap: 8px;
   flex-grow: 1;
   min-width: 0;
+  padding-top: 4px;
 }
 
 .modal-badge-row {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .country-badge {
@@ -147,25 +200,164 @@
   border-radius: var(--radius-full);
 }
 
+/* HÀNG CẢNH BÁO ĐỘ TUỔI (HIỂN THỊ GỌN GÀNG TRÊN 1 HÀNG) */
+.modal-age-warning-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+  flex-wrap: nowrap;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+/* KHOANH ĐỎ: NHÃN MÃ ĐỘ TUỔI (T18, T16, T13, K, P) */
+.age-code-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 900;
+  letter-spacing: 0.3px;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  flex-shrink: 0;
+  line-height: 1.2;
+}
+
+/* KHOANH XANH LÁ: KHUNG CHÚ THÍCH GIẢI THÍCH ĐỘ TUỔI (TỰ CO GIÃN TRÊN 1 HÀNG) */
+.age-desc-tag {
+  display: inline-block;
+  vertical-align: middle;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  background: rgba(13, 17, 26, 0.88);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  line-height: 1.25;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* MÀU SẮC PHÂN LOẠI CHO CODE TAG & DESC TAG */
+.age-code-t18 {
+  background: #ef4444;
+}
+.age-desc-t18 {
+  border: 1.5px solid rgba(239, 68, 68, 0.65);
+  color: #fca5a5;
+}
+
+.age-code-t16 {
+  background: #f97316;
+}
+.age-desc-t16 {
+  border: 1.5px solid rgba(249, 115, 22, 0.65);
+  color: #fdba74;
+}
+
+.age-code-t13 {
+  background: #eab308;
+  color: #000000;
+}
+.age-desc-t13 {
+  border: 1.5px solid rgba(234, 179, 8, 0.65);
+  color: #fde047;
+}
+
+.age-code-k {
+  background: #3b82f6;
+}
+.age-desc-k {
+  border: 1.5px solid rgba(56, 189, 248, 0.65);
+  color: #93c5fd;
+}
+
+.age-code-p {
+  background: #22c55e;
+}
+.age-desc-p {
+  border: 1.5px solid rgba(34, 197, 94, 0.65);
+  color: #86efac;
+}
+
+/* HIỆU ỨNG TƯƠNG TÁC KHI NHÃN ĐỘ TUỔI CÓ PHÂN TÍCH CHI TIẾT (K, T13, T16, T18) */
+.clickable-age-tag {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.clickable-age-tag:hover {
+  filter: brightness(1.2);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+/* NÚT (i) THÔNG TIN NGAY SAU NHÃN CẢNH BÁO ĐỘ TUỔI (CHỈ GIỮ ICON, KHÔNG KHUNG) */
+.age-info-circle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  padding: 0 2px;
+  color: var(--imdb-gold, #f5c518);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  border-radius: 50%;
+  line-height: 1;
+}
+
+.age-info-circle-btn:hover {
+  background: transparent;
+  transform: scale(1.2);
+  filter: drop-shadow(0 0 6px rgba(245, 197, 24, 0.7));
+}
+
+.age-info-icon {
+  color: var(--imdb-gold, #f5c518);
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+@media (max-width: 640px) {
+  .modal-age-warning-row {
+    position: static;
+    margin-bottom: 2px;
+  }
+}
+
 .modal-movie-title {
-  font-size: clamp(1.5rem, 3vw, 2.2rem);
+  font-size: clamp(1.3rem, 3.5vw, 1.85rem);
   font-weight: 800;
   color: #fff;
   line-height: 1.2;
 }
 
 .modal-movie-original {
-  font-size: 1rem;
+  font-size: 0.92rem;
   color: var(--text-secondary);
-  margin-top: -4px;
+  margin-top: -2px;
+  font-weight: 500;
 }
 
 .modal-meta-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 14px;
-  font-size: 0.85rem;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.82rem;
   color: var(--text-muted);
+  margin-top: 2px;
 }
 
 .modal-meta-grid span {
@@ -173,6 +365,50 @@
   align-items: center;
   gap: 4px;
   color: var(--text-secondary);
+}
+
+.modal-credits-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-md);
+  box-sizing: border-box;
+}
+
+.credit-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  width: 100%;
+}
+
+.credit-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  color: #f1f5f9;
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-size: 0.84rem;
+}
+
+.credit-icon {
+  color: #818cf8;
+  flex-shrink: 0;
+}
+
+.credit-value {
+  color: #cbd5e1;
+  font-weight: 400;
+  word-break: break-word;
+  flex: 1;
 }
 
 .modal-cta-row {
@@ -411,10 +647,16 @@
   color: #cbd5e1;
 }
 
-/* DETAILS GRID */
+/* CAST SECTION & DETAILS */
+.modal-cast-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .modal-details-grid {
   display: grid;
-  grid-template-columns: 1.4fr 1fr;
+  grid-template-columns: 1fr;
   gap: 20px;
 }
 
@@ -424,7 +666,7 @@
   gap: 6px;
 }
 
-.cast-pill {
+.cast-pill, .cast-tag {
   font-size: 0.8rem;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--border-subtle);
@@ -433,7 +675,7 @@
   color: var(--text-primary);
 }
 
-.genre-pill-lg {
+.genre-pill-lg, .genre-tag {
   font-size: 0.8rem;
   background: rgba(99, 102, 241, 0.15);
   color: #c7d2fe;
@@ -484,6 +726,20 @@
     right: 12px;
     gap: 8px;
   }
+  .modal-top-left-group {
+    top: 12px;
+    left: 12px;
+    gap: 6px;
+    max-width: calc(100% - 95px);
+  }
+  .modal-top-left-badge .badge {
+    font-size: 0.75rem;
+    padding: 4px 10px;
+  }
+  .banner-genre-pill {
+    font-size: 0.68rem;
+    padding: 3px 8px;
+  }
   .modal-action-btn {
     width: 34px;
     height: 34px;
@@ -492,19 +748,50 @@
     height: 220px;
   }
   .modal-header-info-wrap {
-    flex-direction: column;
+    flex-direction: row;
     align-items: flex-start;
-    margin-top: -50px;
+    margin-top: -65px;
     gap: 14px;
   }
   .modal-poster-wrap {
-    width: 105px;
+    width: 100px;
+    flex-shrink: 0;
+  }
+  .modal-banner-info {
+    padding-top: 2px;
+    gap: 6px;
+  }
+  .modal-movie-title {
+    font-size: 1.35rem;
+    line-height: 1.25;
+  }
+  .modal-age-warning-row {
+    gap: 5px;
+    margin-bottom: 0;
+    flex-wrap: nowrap;
+    width: 100%;
+    min-width: 0;
+  }
+  .age-code-tag {
+    padding: 2px 7px;
+    font-size: 0.76rem;
+    flex-shrink: 0;
+  }
+  .age-desc-tag {
+    padding: 2px 8px;
+    font-size: 0.7rem;
+    line-height: 1.2;
+    flex: 1;
+    min-width: 0;
+  }
+  .age-info-circle-btn {
+    padding: 0 1px;
   }
   .consensus-cards-grid, .modal-details-grid {
     grid-template-columns: 1fr;
   }
   .modal-body-content {
-    padding: 0 20px 24px;
+    padding: 0 16px 24px;
   }
   .modal-scores-cluster {
     display: grid;
@@ -569,6 +856,23 @@
     right: 10px;
     gap: 6px;
   }
+  .modal-top-left-group {
+    top: 10px;
+    left: 10px;
+    gap: 5px;
+    max-width: calc(100% - 85px);
+  }
+  .modal-top-left-badge .badge {
+    font-size: 0.68rem;
+    padding: 3px 8px;
+  }
+  .modal-banner-genres {
+    gap: 4px;
+  }
+  .banner-genre-pill {
+    font-size: 0.64rem;
+    padding: 2px 6px;
+  }
   .modal-action-btn {
     width: 32px;
     height: 32px;
@@ -577,14 +881,71 @@
     height: 190px;
   }
   .modal-header-info-wrap {
-    margin-top: -45px;
+    flex-direction: row;
+    align-items: flex-start;
+    margin-top: -55px;
     gap: 12px;
   }
   .modal-poster-wrap {
-    width: 95px;
+    width: 85px;
+    flex-shrink: 0;
+  }
+  .modal-banner-info {
+    padding-top: 0;
+    gap: 4px;
+  }
+  .modal-movie-title {
+    font-size: 1.15rem;
+    line-height: 1.2;
+  }
+  .modal-movie-original {
+    font-size: 0.8rem;
+  }
+  .modal-age-warning-row {
+    gap: 4px;
+    margin-bottom: 0;
+    flex-wrap: nowrap;
+    width: 100%;
+    min-width: 0;
+  }
+  .age-code-tag {
+    padding: 2px 6px;
+    font-size: 0.7rem;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+  .age-desc-tag {
+    padding: 2px 6px;
+    font-size: 0.65rem;
+    line-height: 1.2;
+    border-radius: 4px;
+    flex: 1;
+    min-width: 0;
+  }
+  .age-info-circle-btn {
+    padding: 0;
+    flex-shrink: 0;
+  }
+  .age-info-circle-btn .age-info-icon {
+    width: 13px;
+    height: 13px;
+  }
+  .modal-badge-row {
+    gap: 5px;
+  }
+  .badge, .country-badge {
+    font-size: 0.68rem;
+    padding: 2px 6px;
+  }
+  .credit-row {
+    font-size: 0.78rem;
+    gap: 6px;
+  }
+  .credit-label {
+    font-size: 0.78rem;
   }
   .modal-body-content {
-    padding: 0 16px 20px;
+    padding: 0 12px 20px;
   }
   .modal-scores-cluster {
     gap: 4px;

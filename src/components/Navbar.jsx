@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { calculateUnifiedScore } from '../services/scoreEngine';
-import { matchMovieSearch, parseYearToNumber } from '../utils/searchUtils';
+import { matchMovieSearch, parseYearToNumber, calculateRelevance } from '../utils/searchUtils';
 import {
   Film,
   Search,
@@ -25,18 +25,27 @@ export function Navbar({
   onOpenSettings,
   onOpenWatchlist,
   onSelectMovie,
-  onResetHome
+  onResetHome,
+  onOpenWeights,
+  onRandomPick
 }) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const searchRef = useRef(null);
   const inputRef = useRef(null);
 
-  // Lọc kết quả tìm kiếm tức thì với hỗ trợ tiếng Việt có dấu/không dấu, sắp xếp theo năm giảm dần
+  // Lọc kết quả tìm kiếm tức thì: ưu tiên phim trùng tên nhất lên đầu
   const filteredSuggestions = searchQuery.trim()
     ? allMovies
         .filter(m => matchMovieSearch(m, searchQuery))
-        .sort((a, b) => (parseYearToNumber(b.year) - parseYearToNumber(a.year)))
+        .sort((a, b) => {
+          const scoreA = calculateRelevance(a, searchQuery);
+          const scoreB = calculateRelevance(b, searchQuery);
+          if (scoreB !== scoreA) {
+            return scoreB - scoreA;
+          }
+          return (parseYearToNumber(b.year) - parseYearToNumber(a.year));
+        })
         .slice(0, 5)
     : [];
 
