@@ -7,6 +7,7 @@
 import { MOCK_MOVIES } from '../data/mockMovies.js';
 import { resolveMovieTitles } from '../utils/movieTitleResolver.js';
 import { formatQuickSynopsis } from '../utils/searchUtils.js';
+import { generateFallbackFilmReview } from './movieDataService.js';
 
 const TMDB_API_KEYS = [
   '4e44d9029b1270a757cddc766a1bcb63',
@@ -137,6 +138,16 @@ function mapTmdbToFilmScore(m) {
     },
     synopsis: formatQuickSynopsis(m.overview || 'Tác phẩm điện ảnh đặc sắc đang có mặt trên nền tảng Netflix toàn cầu.', 60),
     detailedPlot: m.overview || '',
+    filmReview: generateFallbackFilmReview({
+      title: englishTitle || m.title || m.original_title,
+      vietnameseTitle: vietnameseTitle || m.title,
+      genres: genresList,
+      director: m.director || null,
+      cast: [],
+      synopsis: m.overview || '',
+      detailedPlot: m.overview || '',
+      ratings: { imdb: imdbScore, rtCritics: rtCritics }
+    }),
     awards: voteAvg >= 8.2 ? 'Top Tác phẩm xuất sắc Netflix' : null
   };
 }
@@ -153,8 +164,8 @@ export async function fetchLiveNetflixCategory(categoryId = 'netflix_trending') 
     return memoryCache.get(categoryId);
   }
 
-  // 2. Kiểm tra LocalStorage (dùng phiên bản v4 để nạp tiêu đề chuẩn hóa mới)
-  const localKey = `filmscore_netflix_cat_v4_${categoryId}`;
+  // 2. Kiểm tra LocalStorage (dùng phiên bản v6 để nạp nội dung phê bình chuẩn xác mới)
+  const localKey = `filmscore_netflix_cat_v6_${categoryId}`;
   try {
     const saved = localStorage.getItem(localKey);
     if (saved) {
@@ -256,7 +267,7 @@ async function fetchCategoryFromApi(categoryId) {
     if (list.length > 0) {
       memoryCache.set(categoryId, list);
       try {
-        localStorage.setItem(`filmscore_netflix_cat_v4_${categoryId}`, JSON.stringify(list));
+        localStorage.setItem(`filmscore_netflix_cat_v6_${categoryId}`, JSON.stringify(list));
       } catch (e) {}
       return list;
     }

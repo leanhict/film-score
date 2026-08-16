@@ -165,36 +165,164 @@ function condensePlotText(text) {
 
 /**
  * Trích xuất phần cốt truyện đầy đủ (Mở đầu -> Biến cố -> Cao trào -> Kết cục) từ Wikipedia tiếng Việt hoặc tiếng Anh
+ * Kèm hệ thống thẩm định đa tầng (Multi-tier Strict Verification):
+ * 1. Tra cứu trực tiếp tiêu đề trang (Direct Title Lookups).
+ * 2. So khớp tiêu đề chuẩn hóa nghiêm ngặt (Strict Title Normalization & Matching).
+ * 3. Kiểm tra năm sản xuất (Year Conflict Check) loại bỏ các bản phim khác năm.
+ * 4. Đối chiếu thực thể ngữ cảnh (Director, Cast, Original Title).
+ * 5. Loại bỏ trang định hướng (Disambiguation), danh sách (List of), hoặc phần/tập phim không liên quan.
  * Giới hạn tối đa trong phạm vi 300 chữ
  */
-export async function fetchWikipediaPlot(title, year = '', vietnameseTitle = '') {
+export async function fetchWikipediaPlot(title, year = '', vietnameseTitle = '', context = {}) {
+  const { director = '', cast = [], genres = [], originalTitle = '' } = context;
+  const targetYear = parseYearToNumber(year);
+
+  function normalize(s) {
+    return removeVietnameseTones(s || '')
+      .toLowerCase()
+      .replace(/[\(\[\{].*?[\)\]\}]/g, ' ')
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function extractYear(s) {
+    const m = (s || '').match(/\b(19\d\d|20\d\d)\b/);
+    return m ? parseInt(m[1], 10) : null;
+  }
+
+  const normVi = normalize(vietnameseTitle);
+  const normEn = normalize(title);
+  const normOrig = normalize(originalTitle);
+
+  // Thẩm định bài viết Wikipedia
+  function validatePageMetadata(pageTitle, pageExtract = '') {
+    if (!pageTitle) return false;
+
+    // 1. Loại bỏ các trang định hướng, danh sách, phần phim/tập phim
+    if (/định hướng|disambiguation|danh sách|list of|danh mục|tập phim|season \d/i.test(pageTitle)) {
+      return false;
+    }
+
+    const normPageTitle = normalize(pageTitle);
+    const pageYear = extractYear(pageTitle);
+
+    // 2. Kiểm tra năm nếu tiêu đề trang có chứa năm rõ ràng (lệch > 1 năm -> chắc chắn là phim khác)
+    if (pageYear && targetYear && Math.abs(pageYear - targetYear) > 1) {
+      return false;
+    }
+
+    // 3. Kiểm tra độ trùng khớp của Tiêu đề
+    const isDirectTitleMatch = 
+      (normVi && (normPageTitle === normVi || normPageTitle === `${normVi} phim` || normPageTitle === `phim ${normVi}`)) ||
+      (normEn && (normPageTitle === normEn || normPageTitle === `${normEn} film` || normPageTitle === `${normEn} movie`)) ||
+      (normOrig && (normPageTitle === normOrig || normPageTitle === `${normOrig} film`));
+
+    // 4. Kiểm tra sự xuất hiện của các thực thể đặc trưng: Đạo diễn, Diễn viên, Tên gốc
+    let entityScore = 0;
+    const cleanExtract = removeVietnameseTones((pageExtract || '').toLowerCase());
+    
+    if (director && director !== 'N/A' && director !== 'Đang cập nhật') {
+      const dirNorm = normalize(director);
+      if (dirNorm.length > 3 && cleanExtract.includes(dirNorm)) {
+        entityScore += 2;
+      }
+    }
+
+    if (Array.isArray(cast) && cast.length > 0) {
+      for (const actor of cast.slice(0, 4)) {
+        if (actor && actor !== 'N/A' && actor !== 'Đang cập nhật') {
+          const actNorm = normalize(actor);
+          if (actNorm.length > 3 && cleanExtract.includes(actNorm)) {
+            entityScore += 1;
+          }
+        }
+      }
+    }
+
+    if (normEn && normEn.length > 4 && cleanExtract.includes(normEn)) {
+      entityScore += 1;
+    }
+
+    // Nếu tiêu đề trùng khớp trực tiếp:
+    if (isDirectTitleMatch) {
+      return true;
+    }
+
+    // Nếu không khớp trực tiếp tiêu đề, BẮT BUỘC phải có điểm thực thể cao (trùng đạo diễn hoặc nhiều diễn viên)
+    if (entityScore >= 2) {
+      return true;
+    }
+
+    return false;
+  }
+
   // 1. Ưu tiên tra cứu trên Wikipedia tiếng Việt (vi.wikipedia.org)
-  const viQueries = [
-    (vietnameseTitle || title) + (year ? ` (phim ${year})` : ''),
-    (vietnameseTitle || title) + ' (phim)',
-    vietnameseTitle,
-    title
+  const viTitlesToTry = [
+    vietnameseTitle && targetYear ? `${vietnameseTitle} (phim ${targetYear})` : null,
+    vietnameseTitle ? `${vietnameseTitle} (phim)` : null,
+    vietnameseTitle || null,
+    title && targetYear ? `${title} (phim ${targetYear})` : null,
+    title ? `${title} (phim)` : null,
+    title || null
   ].filter(Boolean);
 
-  for (const q of viQueries) {
+  // 1A. Tra cứu trực tiếp theo danh sách tiêu đề chuẩn
+  for (const pageTitle of viTitlesToTry) {
+    try {
+      const pageUrl = `https://vi.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=true&titles=${encodeURIComponent(pageTitle)}&format=json&origin=*`;
+      const pRes = await fetch(pageUrl);
+      if (pRes.ok) {
+        const pData = await pRes.json();
+        const page = Object.values(pData.query?.pages || {})[0];
+        if (page && page.pageid > 0 && !page.missing) {
+          const text = page.extract || '';
+          if (validatePageMetadata(page.title, text)) {
+            const plotMatch = text.match(/== (?:Nội dung|Cốt truyện|Tóm tắt cốt truyện|Nội dung phim) ==\s*([\s\S]*?)(?=== [A-ZÀ-Ỹ]|$)/i);
+            if (plotMatch && plotMatch[1].trim().length > 80) {
+              const condensed = condensePlotText(plotMatch[1].trim());
+              if (condensed && condensed.length > 60) {
+                return formatDetailedPlot(condensed, 300);
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 1B. Thử tìm kiếm Wikipedia tiếng Việt nhưng THẨM ĐỊNH NGHIÊM NGẶT từng kết quả
+  const viSearchQueries = [
+    vietnameseTitle && targetYear ? `${vietnameseTitle} phim ${targetYear}` : null,
+    vietnameseTitle ? `${vietnameseTitle} phim` : null,
+    title ? `${title} phim` : null
+  ].filter(Boolean);
+
+  for (const q of viSearchQueries) {
     try {
       const searchUrl = `https://vi.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(q)}&format=json&origin=*`;
       const sRes = await fetch(searchUrl);
       if (sRes.ok) {
         const sData = await sRes.json();
         if (sData.query?.search?.length > 0) {
-          for (const item of sData.query.search.slice(0, 2)) {
+          for (const item of sData.query.search.slice(0, 3)) {
+            // Thẩm định nhanh qua tiêu đề item trước khi fetch
+            if (!validatePageMetadata(item.title, item.snippet)) {
+              continue;
+            }
             const pageUrl = `https://vi.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=true&titles=${encodeURIComponent(item.title)}&format=json&origin=*`;
             const pRes = await fetch(pageUrl);
             if (pRes.ok) {
               const pData = await pRes.json();
               const page = Object.values(pData.query?.pages || {})[0];
               const text = page?.extract || '';
-              const plotMatch = text.match(/== (?:Nội dung|Cốt truyện|Tóm tắt cốt truyện) ==\s*([\s\S]*?)(?=== [A-ZÀ-Ỹ]|$)/i);
-              if (plotMatch && plotMatch[1].trim().length > 100) {
-                const condensed = condensePlotText(plotMatch[1].trim());
-                if (condensed && condensed.length > 80) {
-                  return formatDetailedPlot(condensed, 300);
+              if (validatePageMetadata(page.title, text)) {
+                const plotMatch = text.match(/== (?:Nội dung|Cốt truyện|Tóm tắt cốt truyện|Nội dung phim) ==\s*([\s\S]*?)(?=== [A-ZÀ-Ỹ]|$)/i);
+                if (plotMatch && plotMatch[1].trim().length > 80) {
+                  const condensed = condensePlotText(plotMatch[1].trim());
+                  if (condensed && condensed.length > 60) {
+                    return formatDetailedPlot(condensed, 300);
+                  }
                 }
               }
             }
@@ -204,23 +332,58 @@ export async function fetchWikipediaPlot(title, year = '', vietnameseTitle = '')
     } catch (e) {}
   }
 
-  // 2. Dự phòng tra cứu trên Wikipedia tiếng Anh (en.wikipedia.org) và dịch sang tiếng Việt
-  try {
-    const enQueries = [
-      `${title} ${year} film plot`,
-      `${title} film plot`,
-      `${title} ${year}`,
-      title
-    ];
+  // 2. Dự phòng tra cứu trên Wikipedia tiếng Anh (en.wikipedia.org) và thẩm định nghiêm ngặt
+  const enTitlesToTry = [
+    title && targetYear ? `${title} (${targetYear} film)` : null,
+    title ? `${title} (film)` : null,
+    originalTitle && targetYear ? `${originalTitle} (${targetYear} film)` : null,
+    originalTitle ? `${originalTitle} (film)` : null,
+    title || null
+  ].filter(Boolean);
 
-    for (const q of enQueries) {
+  // 2A. Tra cứu trực tiếp theo tiêu đề chuẩn tiếng Anh
+  for (const pageTitle of enTitlesToTry) {
+    try {
+      const pageUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=true&titles=${encodeURIComponent(pageTitle)}&format=json&origin=*`;
+      const pRes = await fetch(pageUrl);
+      if (pRes.ok) {
+        const pData = await pRes.json();
+        const page = Object.values(pData.query?.pages || {})[0];
+        if (page && page.pageid > 0 && !page.missing) {
+          const text = page.extract || '';
+          if (validatePageMetadata(page.title, text)) {
+            const plotMatch = text.match(/== (?:Plot|Premise|Synopsis|Plot summary) ==\s*([\s\S]*?)(?=== [A-Z]|$)/i);
+            if (plotMatch && plotMatch[1].trim().length > 80) {
+              const condensedEn = condensePlotText(plotMatch[1].trim());
+              const viTranslated = await translateToVietnamese(condensedEn);
+              if (viTranslated && viTranslated.length > 50) {
+                return formatDetailedPlot(viTranslated, 300);
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 2B. Tìm kiếm tiếng Anh có thẩm định
+  const enSearchQueries = [
+    title && targetYear ? `${title} ${targetYear} film plot` : null,
+    title ? `${title} film plot` : null
+  ].filter(Boolean);
+
+  for (const q of enSearchQueries) {
+    try {
       const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(q)}&format=json&origin=*`;
       const sRes = await fetch(searchUrl);
       if (!sRes.ok) continue;
       const sData = await sRes.json();
 
       if (sData.query?.search?.length > 0) {
-        for (const item of sData.query.search.slice(0, 2)) {
+        for (const item of sData.query.search.slice(0, 3)) {
+          if (!validatePageMetadata(item.title, item.snippet)) {
+            continue;
+          }
           const pageTitle = item.title;
           const pageUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=true&titles=${encodeURIComponent(pageTitle)}&format=json&origin=*`;
           const pRes = await fetch(pageUrl);
@@ -229,23 +392,22 @@ export async function fetchWikipediaPlot(title, year = '', vietnameseTitle = '')
           const page = Object.values(pData.query?.pages || {})[0];
           const text = page?.extract || '';
 
-          const plotMatch = text.match(/== Plot ==\s*([\s\S]*?)(?=== [A-Z]|$)/i) ||
-                            text.match(/== Premise ==\s*([\s\S]*?)(?=== [A-Z]|$)/i) ||
-                            text.match(/== Synopsis ==\s*([\s\S]*?)(?=== [A-Z]|$)/i);
+          if (validatePageMetadata(page.title, text)) {
+            const plotMatch = text.match(/== (?:Plot|Premise|Synopsis|Plot summary) ==\s*([\s\S]*?)(?=== [A-Z]|$)/i);
 
-          if (plotMatch && plotMatch[1].trim().length > 100) {
-            const condensedEn = condensePlotText(plotMatch[1].trim());
-            const viTranslated = await translateToVietnamese(condensedEn);
-            if (viTranslated && viTranslated.length > 60) {
-              return formatDetailedPlot(viTranslated, 300);
+            if (plotMatch && plotMatch[1].trim().length > 80) {
+              const condensedEn = condensePlotText(plotMatch[1].trim());
+              const viTranslated = await translateToVietnamese(condensedEn);
+              if (viTranslated && viTranslated.length > 50) {
+                return formatDetailedPlot(viTranslated, 300);
+              }
             }
           }
         }
       }
-    }
-  } catch (e) {
-    console.warn('Lỗi tải tóm tắt Wikipedia:', e);
+    } catch (e) {}
   }
+
   return null;
 }
 
@@ -788,13 +950,26 @@ async function fetchMovieFromTmdb(tmdbId, imdbIdOverride = null, preferredMediaT
   }
   netflixSynopsis = formatQuickSynopsis(netflixSynopsis, 60);
 
-  // Cốt truyện chi tiết dạng Spoiler từ Wikipedia (narrative plot) đầy đủ từ mở đầu đến kết cục (tối đa 200 từ)
+  // Cốt truyện chi tiết dạng Spoiler từ Wikipedia (narrative plot) có thẩm định nghiêm ngặt hoặc OMDb Full Plot
   let detailedPlot = '';
-  const wikiPlot = await fetchWikipediaPlot(englishTitle || rawTitle, year, vietnameseTitle);
+  const wikiPlot = await fetchWikipediaPlot(englishTitle || rawTitle, year, vietnameseTitle, {
+    director,
+    cast,
+    genres,
+    originalTitle: rawOrigTitle
+  });
   if (wikiPlot && wikiPlot.length > 50) {
     detailedPlot = wikiPlot;
   }
-  if (!detailedPlot) {
+
+  // Nếu không có Wikipedia đã thẩm định, dùng bản OMDb full plot (thực tế từ IMDb)
+  if (!detailedPlot && realOmdbData?.Plot && realOmdbData.Plot !== 'N/A') {
+    const translated = await translateToVietnamese(realOmdbData.Plot);
+    detailedPlot = formatDetailedPlot(translated, 300);
+  }
+
+  // Nếu vẫn chưa có, xây dựng tóm tắt diễn biến đầy đủ từ synopsis chính thức và thông tin ekip
+  if (!detailedPlot || detailedPlot.length < 50) {
     detailedPlot = buildVietnameseDetailedPlot(vietnameseTitle || rawTitle, year, genres, director, cast, netflixSynopsis);
   }
 
@@ -836,6 +1011,8 @@ async function fetchMovieFromTmdb(tmdbId, imdbIdOverride = null, preferredMediaT
       genres: genres,
       director: director,
       cast: cast.length > 0 ? cast : (realOmdbData?.Actors ? realOmdbData.Actors.split(', ') : ['Đang cập nhật']),
+      synopsis: netflixSynopsis,
+      detailedPlot: detailedPlot,
       ratings: { imdb: imdbScore, rtCritics: rtCritics }
     }),
     criticConsensus: consensus.critic,
@@ -1130,7 +1307,12 @@ async function parseOmdbData(data) {
 
   // 5. Cốt truyện chi tiết dạng Spoiler từ Wikipedia (narrative plot) hoặc OMDb Full Plot
   let detailedPlot = '';
-  const wikiPlot = await fetchWikipediaPlot(data.Title, data.Year, vietnameseTitle);
+  const wikiPlot = await fetchWikipediaPlot(data.Title, data.Year, vietnameseTitle, {
+    director: data.Director !== 'N/A' ? data.Director : '',
+    cast: castArray,
+    genres: genres,
+    originalTitle: data.Title
+  });
   if (wikiPlot && wikiPlot.length > 50) {
     detailedPlot = wikiPlot;
   }
@@ -1171,6 +1353,8 @@ async function parseOmdbData(data) {
       genres: genres,
       director: data.Director !== 'N/A' ? data.Director : null,
       cast: castArray,
+      synopsis: viSynopsis,
+      detailedPlot: detailedPlot,
       ratings: { imdb: imdb, rtCritics: rtCritics }
     }),
     criticConsensus: consensus.critic,
@@ -1191,49 +1375,214 @@ async function parseOmdbData(data) {
 }
 
 /**
- * Tự động tạo bài Phê bình phim (<= 200 từ) chuẩn xác bao gồm:
- * 1. Nhận xét, nhận định phim
- * 2. Ý nghĩa và giá trị thông điệp của phim
- * 3. Những điểm tốt nổi bật của tác phẩm
+ * Tự động tạo bài Phê bình phim chuyên sâu, sắc sảo và sát thực tế (130 - 200 từ)
+ * Phân tích đa tầng theo thể loại, xung đột cốt truyện cụ thể, phong cách đạo diễn, dàn diễn viên và điểm số thực tế
+ * Tuyệt đối tránh các mẫu câu rập khuôn, sáo rỗng.
  */
 export function generateFallbackFilmReview(movieData = {}) {
-  if (movieData.filmReview && typeof movieData.filmReview === 'string' && movieData.filmReview.trim().length >= 40) {
+  // Nếu là mẫu câu boilerplate rập khuôn cũ, bỏ qua để tự động tái tạo bài phê bình chuẩn xác theo engine mới
+  const isOldBoilerplate = typeof movieData.filmReview === 'string' && (
+    movieData.filmReview.includes('lồng ghép những bài học ý nghĩa về tình thân, lòng trung thành') ||
+    movieData.filmReview.includes('truyền tải những thông điệp nhân văn sâu sắc về bản lĩnh con người, sự hy sinh') ||
+    movieData.filmReview.includes('đề cao tinh thần quả cảm, tình bạn và ý chí chiến đấu vượt qua thử thách')
+  );
+
+  if (!isOldBoilerplate && movieData.filmReview && typeof movieData.filmReview === 'string' && movieData.filmReview.trim().length >= 50) {
     return formatFilmReview(movieData.filmReview, 200);
   }
 
   const title = movieData.vietnameseTitle || movieData.title || 'Bộ phim';
-  const genres = Array.isArray(movieData.genres) && movieData.genres.length > 0 
-    ? movieData.genres.join(', ') 
-    : (typeof movieData.genres === 'string' && movieData.genres ? movieData.genres : 'Điện ảnh');
-  const director = movieData.director && movieData.director !== 'N/A' && movieData.director !== 'Đang cập nhật' 
+  const genresList = Array.isArray(movieData.genres) && movieData.genres.length > 0 
+    ? movieData.genres 
+    : (typeof movieData.genres === 'string' && movieData.genres ? movieData.genres.split(',').map(g => g.trim()).filter(Boolean) : ['Điện ảnh']);
+  const genreStr = genresList.join(', ');
+
+  const director = movieData.director && movieData.director !== 'N/A' && movieData.director !== 'Đang cập nhật' && !movieData.director.includes('Netflix')
     ? movieData.director 
     : null;
+
   const cast = Array.isArray(movieData.cast) && movieData.cast.length > 0 
-    ? movieData.cast.slice(0, 3).filter(c => c !== 'Đang cập nhật').join(', ') 
+    ? movieData.cast.slice(0, 3).filter(c => c !== 'Đang cập nhật' && c !== 'N/A' && !c.includes('Diễn viên')).join(', ') 
     : null;
+
   const imdb = movieData.ratings?.imdb;
   const rtCritics = movieData.ratings?.rtCritics;
-  const score = imdb ? imdb * 10 : (rtCritics || 72);
+  const metascore = movieData.ratings?.metascore;
 
-  let assessment = '';
-  let themes = '';
-  let strengths = '';
+  // Tính điểm trung bình chuẩn hóa
+  const scores = [imdb ? imdb * 10 : null, rtCritics, metascore].filter(x => x !== null && !isNaN(x));
+  const score = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 70;
 
+  // Thu thập toàn bộ ngữ cảnh văn bản để phân tích ngữ nghĩa
+  const plotContext = `${movieData.synopsis || ''} ${movieData.detailedPlot || ''} ${movieData.overview || ''} ${movieData.plot || ''}`.toLowerCase();
+
+  // 1. PHÂN LOẠI THỂ LOẠI CHỦ ĐẠO
+  const gLower = genreStr.toLowerCase();
+  const isHorror = gLower.includes('kinh dị') || gLower.includes('horror');
+  const isSciFi = gLower.includes('khoa học viễn tưởng') || gLower.includes('sci-fi') || gLower.includes('viễn tưởng');
+  const isThriller = gLower.includes('giật gân') || gLower.includes('ly kỳ') || gLower.includes('thriller') || gLower.includes('bí ẩn') || gLower.includes('mystery');
+  const isCrime = gLower.includes('tội phạm') || gLower.includes('crime') || gLower.includes('noir');
+  const isAction = gLower.includes('hành động') || gLower.includes('action') || gLower.includes('phiêu lưu') || gLower.includes('adventure');
+  const isAnimation = gLower.includes('hoạt hình') || gLower.includes('animation') || gLower.includes('anime');
+  const isRomance = gLower.includes('lãng mạn') || gLower.includes('tình cảm') || gLower.includes('romance');
+  const isComedy = gLower.includes('hài') || gLower.includes('comedy');
+  const isDrama = gLower.includes('chính kịch') || gLower.includes('drama') || gLower.includes('tiểu sử') || gLower.includes('biography');
+  const isWar = gLower.includes('chiến tranh') || gLower.includes('war') || gLower.includes('lịch sử') || gLower.includes('history');
+
+  // 2. TRÍCH XUẤT XUNG ĐỘT CỐT TRUYỆN THỰC TẾ (SEMANTIC CONFLICT EXTRACTION)
+  const isTrappedOrSurvival = /mắc kẹt|cô lập|sinh tồn|bức tường|rào chắn|rào cản|nguy hiểm|sống sót|thoát khỏi|trapped|isolated|survival|barrier|lockdown/.test(plotContext);
+  const isTechOrAlien = /người ngoài hành tinh|quái vật|vũ trụ|robot|ai|trí tuệ nhân tạo|thảm họa|tận thế|dị thường|công nghệ|alien|monster|space|future|anomaly|apocalypse/.test(plotContext);
+  const isSerialKillerOrDetect = /sát nhân|kẻ giết người|thám tử|vụ án|điều tra|manh mối|truy lùng|bí ẩn|tội ác|killer|detective|investigation|murder|clue/.test(plotContext);
+  const isPsychologicalOrTrauma = /tâm lý|hoang tưởng|ảo giác|sang chấn|ám ảnh|nội tâm|mất trí|tâm thần|psychological|paranoia|trauma|hallucination/.test(plotContext);
+  const isRevengeOrUnderworld = /trả thù|báo thù|xã hội đen|băng đảng|thanh trừng|tội phạm|đối đầu|revenge|vengeance|gangster|cartel|mafia/.test(plotContext);
+  const isLoveOrHeartbreak = /tình yêu|hẹn hò|chia tay|người yêu|hôn nhân|yêu đương|duyên|tình cảm|love|romance|relationship|marriage/.test(plotContext);
+  const isFamilyOrGrief = /gia đình|cha con|mẹ con|anh em|mất mát|nỗi đau|chữa lành|tuổi thơ|family|father|mother|grief|loss|healing/.test(plotContext);
+  const isSatireOrSociety = /châm biếm|xã hội|giàu nghèo|giai cấp|quyền lực|tham nhũng|giả tạo|satire|society|class|wealth|power/.test(plotContext);
+
+  // 3. XÂY DỰNG 3 TRỤ CỘT ĐÁNH GIÁ (GÓC NHÌN & TÔNG GIỌNG, CHỦ ĐỀ & XUNG ĐỘT, ĐIỂM SÁNG NGHỆ THUẬT)
+  let opening = '';
+  let themeAnalysis = '';
+  let craftHighlight = '';
+
+  // --- TRỤ 1: GÓC NHÌN & TÔNG GIỌNG ĐIỆN ẢNH (OPENING) ---
   if (score >= 82) {
-    assessment = `"${title}" là một kiệt tác ${genres} xuất sắc với tầm nhìn nghệ thuật chỉn chu và giàu sức nặng điện ảnh${director ? ` dưới sự chỉ đạo tài ba của đạo diễn ${director}` : ''}.`;
-    themes = `Tác phẩm truyền tải những thông điệp nhân văn sâu sắc về bản lĩnh con người, sự hy sinh và những giằng xé nội tâm khi đối diện với các ngã rẽ định mệnh của cuộc đời.`;
-    strengths = `Điểm sáng nổi bật của bộ phim nằm ở nhịp kể chuyện lôi cuốn, các góc máy duy mỹ cùng diễn xuất thăng hoa${cast ? ` của dàn diễn viên gồm ${cast}` : ''}, hòa quyện với phần âm thanh giàu cảm xúc mang lại trải nghiệm xem trọn vẹn.`;
+    if (isHorror || isThriller) {
+      opening = `"${title}" là một tác phẩm ${genreStr} mẫu mực, gây ấn tượng mạnh bởi nghệ thuật xây dựng bầu không khí căng thẳng tột độ và khả năng thao túng tâm lý khán giả bậc thầy${director ? ` dưới bàn tay chỉ đạo tài hoa của đạo diễn ${director}` : ''}.`;
+    } else if (isSciFi) {
+      opening = `"${title}" là một dấu ấn khoa học viễn tưởng đột phá với tầm nhìn ý niệm giàu chiều sâu triết lý${director ? ` do đạo diễn ${director} kiến tạo` : ''}, mang đến một thế giới quan điện ảnh đầy choáng ngợp và ám ảnh.`;
+    } else if (isAnimation) {
+      opening = `"${title}" là một kỳ quan hoạt hình lộng lẫy kết tinh trọn vẹn trí tưởng tượng phi thường cùng ngôn ngữ hình ảnh giàu chất thơ${director ? ` của đạo diễn ${director}` : ''}.`;
+    } else if (isCrime || isAction) {
+      opening = `"${title}" xác lập chuẩn mực cao cho dòng phim ${genreStr} với kịch bản đa tầng chặt chẽ, các phân cảnh dàn dựng gai góc và tính chân thực đến nghẹt thở.`;
+    } else if (isRomance || isDrama) {
+      opening = `"${title}" là tác phẩm ${genreStr} sâu sắc và đầy trăn trở, chạm đến tận cùng cảm xúc người xem nhờ lăng kính quan sát tinh tế về bản chất con người${director ? ` của đạo diễn ${director}` : ''}.`;
+    } else {
+      opening = `"${title}" là một tác phẩm điện ảnh xuất sắc, ghi điểm bởi phong cách dàn dựng chỉn chu, góc nhìn sắc bén và sức nặng tư tưởng rõ nét trong từng khuôn hình.`;
+    }
   } else if (score >= 68) {
-    assessment = `"${title}" là bộ phim ${genres} hấp dẫn, mang đến trải nghiệm giải trí chất lượng và cân bằng tốt giữa tính kịch tính với chiều sâu cảm xúc.`;
-    themes = `Bộ phim khéo léo lồng ghép những bài học ý nghĩa về tình thân, lòng trung thành và khát vọng vượt lên nghịch cảnh trong cuộc sống.`;
-    strengths = `Tác phẩm ghi điểm nhờ nhịp độ mạch lạc, các phân đoạn cao trào được dàn dựng chắc tay${cast ? ` kết hợp cùng sự tương tác ăn ý của dàn diễn viên (${cast})` : ''}, tạo nên sức hút xuyên suốt thời lượng.`;
+    if (isHorror || (isSciFi && isHorror) || isTrappedOrSurvival) {
+      opening = `"${title}" là bộ phim ${genreStr} sở hữu tiền đề câu chuyện độc đáo và lôi cuốn, khéo léo đẩy các nhân vật vào tình huống ngặt nghèo để bộc lộ bản năng và giới hạn con người.`;
+    } else if (isSciFi) {
+      opening = `"${title}" khai thác dòng phim ${genreStr} với ý tưởng thú vị, kết hợp nhịp nhàng giữa yếu tố kỹ xảo hiện đại và sự tò mò khám phá những bí ẩn chưa có lời giải.`;
+    } else if (isAnimation || isComedy) {
+      opening = `"${title}" mang đến nguồn năng lượng giải trí tươi sáng, cân bằng khéo léo giữa những tình huống hóm hỉnh duyên dáng và những bài học cảm xúc chạm tới nhiều đối tượng khán giả.`;
+    } else if (isCrime || isAction) {
+      opening = `"${title}" là bộ phim ${genreStr} duy trì được nhịp độ dồn dập, các pha hành động và nút thắt kịch bản được bố cục chắc tay để giữ chân người xem suốt thời lượng.`;
+    } else {
+      opening = `"${title}" là tác phẩm ${genreStr} được dàn dựng tròn trịa, ghi điểm nhờ mạch dẫn dắt tự nhiên, cốt truyện rõ ràng và khả năng kết nối cảm xúc hiệu quả với người xem.`;
+    }
+  } else if (score >= 50) {
+    if (isHorror || isThriller) {
+      opening = `"${title}" tiếp cận thể loại ${genreStr} theo phong cách giải trí trực diện, tập trung vào các thủ pháp jump-scare và cảm giác rùng rợn dù kịch bản còn theo một số lối mòn quen thuộc.`;
+    } else if (isAction || isSciFi) {
+      opening = `"${title}" là bộ phim ${genreStr} thiên về tính giải trí thị giác, sở hữu ý tưởng ban đầu khá bắt mắt dù việc phát triển chiều sâu tâm lý nhân vật chưa thực sự triệt để.`;
+    } else {
+      opening = `"${title}" là tác phẩm ${genreStr} mang tính giải trí nhẹ nhàng, đáp ứng vừa vặn kỳ vọng thư giãn đơn thuần của người xem dù chưa tạo ra nhiều đột phá mang tính bước ngoặt.`;
+    }
   } else {
-    assessment = `"${title}" là tác phẩm ${genres} mang phong cách giải trí trực diện, tập trung khai thác những yếu tố hành động và kịch tính phục vụ khán giả yêu thích thể loại này.`;
-    themes = `Phim đề cao tinh thần quả cảm, tình bạn và ý chí chiến đấu vượt qua thử thách cam go trước những tình huống hiểm nghèo.`;
-    strengths = `Điểm cộng đáng ghi nhận của phim là kỹ xảo hình ảnh sinh động, tiết tấu nhanh dồn dập cùng những màn trình diễn nhiệt huyết của dàn diễn viên.`;
+    opening = `"${title}" mang phong cách ${genreStr} với ý tưởng ban đầu có nét thú vị, tuy nhiên cách triển khai đường dây câu chuyện và nhịp dựng còn bộc lộ một số hạn chế nhất định.`;
   }
 
-  const fullReview = `${assessment} ${themes} ${strengths}`;
+  // --- TRỤ 2: CHIỀU SÂU CHỦ ĐỀ & XUNG ĐỘT KỊCH BẢN (THEMES & CORE CONFLICT) ---
+  if (isTrappedOrSurvival || (isHorror && isSciFi)) {
+    themeAnalysis = `Tác phẩm đào sâu vào nỗi sợ nguyên bản trước sự cô lập, bản năng sinh tồn và áp lực tâm lý cực hạn khi con người bị dồn vào ranh giới hiểm nghèo không lối thoát.`;
+  } else if (isPsychologicalOrTrauma) {
+    themeAnalysis = `Bộ phim mổ xẻ sắc sảo những góc khuất tâm lý, sự hoài nghi và những sang chấn vô hình đè nặng lên nhân vật, làm mờ đi ranh giới giữa thực tại và ảo ảnh.`;
+  } else if (isSerialKillerOrDetect || isCrime) {
+    themeAnalysis = `Phim đặt ra những nan đề gai góc về ranh giới mong manh giữa công lý và tội ác, sự tha hóa trước cám dỗ quyền lực và cái giá đắt đỏ của sự thật trong một thế giới đầy biến động.`;
+  } else if (isTechOrAlien || isSciFi) {
+    themeAnalysis = `Tác phẩm khơi gợi những câu hỏi hiện sinh đầy trăn trở về vị thế của con người trước những hiện tượng bí ẩn khôn lường, sự tiến bộ của công nghệ và vận mệnh tương lai.`;
+  } else if (isRevengeOrUnderworld) {
+    themeAnalysis = `Câu chuyện khắc họa vòng xoáy ân oán khốc liệt, nơi sự trả thù và khát vọng chuộc tội trở thành bài kiểm tra nghiệt ngã nhất đối với lương tri và phẩm giá con người.`;
+  } else if (isSatireOrSociety) {
+    themeAnalysis = `Bộ phim châm biếm sâu cay những định kiến giai cấp và thói giả tạo trong đời sống đương đại, vạch trần nghịch lý xã hội qua góc nhìn giàu tính ẩn dụ.`;
+  } else if (isLoveOrHeartbreak || isRomance) {
+    themeAnalysis = `Tác phẩm soi chiếu chân thực những rung động tinh tế, sự đồng điệu tâm hồn cũng như những giằng xé khó tránh giữa tình yêu, duyên số và hiện thực cuộc sống.`;
+  } else if (isFamilyOrGrief) {
+    themeAnalysis = `Bộ phim truyền tải thông điệp thấm thía về sự gắn kết gia đình, quá trình đối diện với mất mát để học cách chữa lành và tìm lại bình yên nội tại.`;
+  } else if (isWar) {
+    themeAnalysis = `Tác phẩm tái hiện chân thực sự tàn khốc của chiến tranh, tôn vinh tinh thần quả cảm và khắc họa sâu sắc những vết thương tinh thần dai dẳng của những người trong cuộc.`;
+  } else if (isAnimation || isComedy) {
+    themeAnalysis = `Phim gửi gắm thông điệp tích cực về lòng can đảm bước ra khỏi vùng an toàn, giá trị của việc trân trọng bản ngã và niềm tin vào những điều tử tế trong cuộc sống.`;
+  } else if (isHorror) {
+    themeAnalysis = `Tác phẩm khai thác nỗi sợ vô hình trước những thế lực siêu nhiên bí ẩn, thử thách lòng dũng cảm và đức tin của con người trước bóng tối bủa vây.`;
+  } else if (isAction) {
+    themeAnalysis = `Bộ phim đề cao tinh thần kiên định, bản lĩnh đương đầu với thử thách cam go và sự quả cảm bảo vệ những giá trị cốt lõi trước hiểm họa.`;
+  } else {
+    themeAnalysis = `Tác phẩm phản ánh chân thực những xung đột đời thường, khắc họa sâu sắc những ngã rẽ số phận và bài học ý nghĩa về sự thấu cảm giữa người với người.`;
+  }
+
+  // --- TRỤ 2.5: ĐIỂM SÁNG NGHỆ THUẬT & DIỄN XUẤT (CRAFT & PERFORMANCES) ---
+  if (score >= 82) {
+    craftHighlight = `Điểm sáng vượt trội nằm ở kỹ thuật dàn dựng chắc tay${cast ? `, diễn xuất thăng hoa của dàn diễn viên (${cast})` : ''}, hòa quyện cùng ngôn ngữ hình ảnh và âm thanh giàu sức nặng.`;
+  } else if (score >= 68) {
+    if (isHorror || isThriller || isTrappedOrSurvival) {
+      craftHighlight = `Điểm cộng lớn của phim là nhịp dựng nghẹt thở, thiết kế âm thanh tạo cảm giác giật gân hiệu quả${cast ? ` cùng diễn xuất nhập tâm của dàn diễn viên (${cast})` : ''}.`;
+    } else if (isSciFi || isAction) {
+      craftHighlight = `Tác phẩm ghi điểm nhờ kỹ xảo thị giác sinh động, tiết tấu gãy gọn${cast ? ` kết hợp sự tương tác ăn ý của dàn diễn viên (${cast})` : ''}.`;
+    } else {
+      craftHighlight = `Sự cộng hưởng giữa ngôn ngữ điện ảnh mượt mà${cast ? `, diễn xuất tự nhiên của dàn diễn viên (${cast})` : ''} và phần âm nhạc giàu cảm xúc giúp câu chuyện dễ chạm tới người xem.`;
+    }
+  } else {
+    if (isAction || isSciFi || isHorror) {
+      craftHighlight = `Phim ghi nhận nỗ lực về mặt hiệu ứng hình ảnh và âm thanh${cast ? ` cùng sự thể hiện nhiệt huyết của dàn diễn viên (${cast})` : ''}.`;
+    } else {
+      craftHighlight = `Điểm đáng ghi nhận là dàn diễn viên${cast ? ` (${cast})` : ''} đã thể hiện tròn vai, mang lại những phân đoạn thư giãn dễ chịu.`;
+    }
+  }
+
+  // --- TRỤ 3: HẠN CHẾ, HẠT SẠN & ĐIỂM TRỪ CẦN CÂN NHẮC (CRITICAL SHORTCOMINGS & LIMITATIONS) ---
+  let shortcomings = '';
+
+  if (score >= 82) {
+    if (isHorror || isThriller) {
+      shortcomings = `Dẫu vậy, tông phim u tối cùng nhịp dồn dập về mặt tâm lý có thể tạo cảm giác khá nặng nề đối với những ai tìm kiếm sự giải trí nhẹ nhàng.`;
+    } else if (isSciFi) {
+      shortcomings = `Tuy nhiên, việc tích hợp lượng lớn các khái niệm ý niệm phức tạp cùng thời lượng dài đòi hỏi người xem phải thực sự kiên nhẫn và tập trung cao độ.`;
+    } else if (isDrama || isWar) {
+      shortcomings = `Dù vậy, tiết tấu tự sự ở một vài phân đoạn tương đối chậm rãi, đặt trọng tâm vào chiều sâu nội tâm hơn là các biến cố kịch tính dồn dập.`;
+    } else if (isAnimation || isComedy) {
+      shortcomings = `Dẫu gần như hoàn hảo, một vài nút thắt giải quyết ở hồi kết vẫn theo hướng tương đối an toàn so với kỳ vọng bứt phá của người xem khó tính.`;
+    } else {
+      shortcomings = `Tuy vậy, nhịp phim đôi lúc hơi gấp gáp ở phần chuyển tiếp khiến một số nhân vật phụ chưa có nhiều đất diễn để bộc lộ hết tiềm năng.`;
+    }
+  } else if (score >= 68) {
+    if (isTrappedOrSurvival || (isHorror && isSciFi)) {
+      shortcomings = `Dẫu vậy, một số quyết định của nhân vật ở nửa sau còn mang tính sắp đặt gượng gạo, nhịp phim có lúc chùng xuống ở hồi giữa và phần giải thích nguồn gốc bí ẩn chưa thực sự làm thỏa mãn trọn vẹn khán giả khó tính.`;
+    } else if (isHorror || isThriller) {
+      shortcomings = `Mặt hạn chế là kịch bản về hồi kết còn phụ thuộc vào vài mô-típ quen thuộc, một số chi tiết logic chưa được giải quyết triệt để và cao trào có phần hơi vội vã.`;
+    } else if (isSciFi) {
+      shortcomings = `Điểm trừ nhỏ là một vài mắt xích logic khoa học còn hơi khiên cưỡng và cách gỡ nút thắt ở hồi ba chưa thực sự tạo được cú hích cảm xúc bùng nổ như kỳ vọng ban đầu.`;
+    } else if (isCrime || isAction) {
+      shortcomings = `Hạn chế là tuyến nhân vật phản diện còn thiếu chiều sâu động cơ, kịch bản đôi chỗ dễ đoán và lạm dụng cảnh hành động để khỏa lấp khoảng trống tâm lý.`;
+    } else if (isRomance || isComedy) {
+      shortcomings = `Tuy nhiên, cốt truyện vẫn đi theo công thức lãng mạn tương đối an toàn, một vài mâu thuẫn được tháo gỡ có phần dễ dãi khiến dư vị cảm xúc chưa thật sự lắng đọng.`;
+    } else {
+      shortcomings = `Điểm hạn chế là nhịp kể ở một số trường đoạn còn dàn trải, cách phát triển chiều sâu nhân vật đôi chỗ còn thiếu những khoảng lặng mang tính bước ngoặt.`;
+    }
+  } else if (score >= 50) {
+    if (isHorror || isThriller) {
+      shortcomings = `Hạn chế lớn là việc lạm dụng quá đà các thủ pháp hù dọa sáo mòn, động cơ nhân vật thiếu tính thuyết phục và kịch bản bộc lộ nhiều lỗ hổng logic ở nửa cuối.`;
+    } else if (isAction || isSciFi) {
+      shortcomings = `Điểm trừ đáng kể nằm ở phần kịch bản rập khuôn theo lối mòn, kỹ xảo thị giác chưa thực sự đồng đều và chiều sâu cảm xúc bị lấn át bởi các tình tiết bề nổi.`;
+    } else {
+      shortcomings = `Tác phẩm bộc lộ điểm yếu rõ nét ở khâu phát triển đường dây câu chuyện còn non tay, nhịp dựng thiếu sự liền mạch và các nhân vật chưa tạo được sự đồng cảm sâu sắc.`;
+    }
+  } else {
+    shortcomings = `Điểm trừ lớn nhất của phim là kịch bản rời rạc với nhiều lỗ hổng phi lý, cách giải quyết xung đột gượng gạo và nhịp phim thiếu ăn khớp, khiến tác phẩm chưa đạt được hiệu quả như ý muốn.`;
+  }
+
+  // --- TRỤ 4: TỔNG KẾT & ĐÁNH GIÁ TRẢI NGHIỆM (VERDICT) ---
+  let verdict = '';
+  if (score >= 82) {
+    verdict = `Tổng thể, đây là một tác phẩm điện ảnh xuất sắc rất đáng thưởng thức dành cho những ai trân trọng nghệ thuật kể chuyện chỉn chu và giàu sức nặng.`;
+  } else if (score >= 68) {
+    verdict = `Nhìn chung, tác phẩm vẫn là một lựa chọn giải trí chất lượng và đáng giá cho khán giả yêu thích thể loại, miễn là người xem sẵn sàng bỏ qua một vài hạt sạn nhỏ trong kịch bản.`;
+  } else {
+    verdict = `Tựu trung lại, đây là một bộ phim giải trí vừa vặn cho nhu cầu thư giãn nhẹ nhàng dù chưa để lại nhiều dư âm thực sự sâu sắc.`;
+  }
+
+  const fullReview = `${opening} ${themeAnalysis} ${craftHighlight} ${shortcomings} ${verdict}`;
   return formatFilmReview(fullReview, 200);
 }
 
@@ -1340,15 +1689,21 @@ Bạn là chuyên gia phân tích và thẩm định điện ảnh. Hãy cung c�
 - Đạo diễn: ${movieData.director}
 - Diễn viên: ${movieData.cast?.join(', ')}
 - Thể loại: ${movieData.genres?.join(', ')}
-- Chú thích phim ban đầu: "${movieData.synopsis}"
-- Cốt truyện chi tiết hiện có: "${movieData.detailedPlot?.slice(0, 500) || ''}"
+- Tiền đề / Chú thích phim chính thức: "${movieData.synopsis}"
 
 YÊU CẦU CỰC KỲ QUAN TRỌNG VỀ TÊN PHIM, TÓM TẮT VÀ PHÊ BÌNH:
 1. "vietnameseTitle": Tên phim tiếng Việt chính thức tại rạp/nền tảng chiếu hoặc dịch chuẩn nghĩa tự nhiên (VD: "Kỵ Sĩ Bóng Đêm", "Vùng Đất Linh Hồn", "Ký Sinh Trùng", "Hố Đen Tử Thần", "Kẻ Thu Nợ: Trả Thù").
 2. "englishTitle": Tên phim tiếng Anh chuẩn quốc tế.
-3. "synopsis": Tóm tắt giới thiệu tiền đề phim ngắn gọn KHÔNG SPOILER (TỐI ĐA 60 CHỮ) theo phong cách chú thích phim Netflix / rạp chiếu, giới thiệu bối cảnh và mâu thuẫn mở đầu mà tuyệt đối KHÔNG tiết lộ plot twist, bước ngoặt hay cái kết.
-4. "detailedPlot": Tóm tắt TOÀN BỘ cốt truyện từ đầu đến cuối ĐẦY ĐỦ TRỌN VẸN VÀ CHI TIẾT TRONG PHẠM VI TỐI ĐA 300 CHỮ (khoảng 220 - 280 từ tiếng Việt), tuyệt đối KHÔNG dừng giữa chừng hay tóm tắt sơ sài. Phải tóm lược mạch lạc 4 giai đoạn: 1. Mở đầu & bối cảnh -> 2. Diễn biến mâu thuẫn -> 3. Nút thắt / Biến cố cao trào -> 4. Kết cục trọn vẹn và số phận cuối cùng của các nhân vật chính.
-5. "filmReview": Bài phê bình và nhận định phim chuyên sâu (TỐI ĐA 200 TỪ TIẾNG VIỆT): Đánh giá tổng quan tác phẩm, phân tích những thông điệp và ý nghĩa nhân văn/nghệ thuật sâu sắc của bộ phim, nêu bật các điểm tốt nổi trội (chỉ đạo đạo diễn, diễn xuất, kịch bản, âm nhạc, góc quay) và lý do phim xứng đáng thưởng thức.
+3. "synopsis": Tóm tắt giới thiệu tiền đề phim ngắn gọn KHÔNG SPOILER (TỐI ĐA 60 CHỮ) theo phong cách chú thích phim Netflix / rạp chiếu, bám sát tiền đề câu chuyện chính thức mà tuyệt đối KHÔNG tiết lộ plot twist, bước ngoặt hay cái kết.
+4. "detailedPlot": Tóm tắt TOÀN BỘ cốt truyện từ đầu đến cuối ĐẦY ĐỦ TRỌN VẸN VÀ CHI TIẾT TRONG PHẠM VI TỐI ĐA 300 CHỮ (khoảng 220 - 280 từ tiếng Việt), tuyệt đối KHÔNG dừng giữa chừng hay tóm tắt sơ sài. Phải bám sát ĐÚNG nhân vật, đạo diễn, thể loại và bối cảnh của tác phẩm này. TUYỆT ĐỐI KHÔNG sử dụng cốt truyện của bộ phim khác hoặc nhầm lẫn sang các phim hoạt hình/phim khác có từ khóa tương tự. Phải tóm lược mạch lạc 4 giai đoạn: 1. Mở đầu & bối cảnh -> 2. Diễn biến mâu thuẫn -> 3. Nút thắt / Biến cố cao trào -> 4. Kết cục trọn vẹn và số phận cuối cùng của các nhân vật chính.
+5. "filmReview": Bài phê bình và nhận định điện ảnh ĐA CHIỀU, KHÁCH QUAN (TỪ 140 ĐẾN 200 TỪ TIẾNG VIỆT):
+   - Vai trò: Bạn là một nhà phê bình điện ảnh chuyên nghiệp (theo phong cách Variety, Indiewire, Roger Ebert bằng tiếng Việt).
+   - Yêu cầu cốt lõi: Phân tích ĐO NI ĐÓNG GIÀY cho riêng bộ phim này. BẮT BUỘC ĐÁNH GIÁ 2 MẶT CÂN BẰNG (CẢ KHEN LẪN CHÊ / ĐIỂM TRỪ), tuyệt đối không chỉ khen một chiều!
+   - Cấu trúc bài viết gồm:
+     + [Góc nhìn & Điểm sáng nổi bật]: Nhận định phong cách đạo diễn, ý tưởng tiền đề, chiều sâu thông điệp và điểm mạnh về diễn xuất, không khí, hình ảnh, âm nhạc.
+     + [Hạn chế & Điểm trừ cần cân nhắc]: Thẳng thắn chỉ ra các nhược điểm, hạt sạn thực tế của phim (ví dụ: kịch bản hồi kết vội vã, nhịp phim đôi chỗ chùng xuống/kén người xem, động cơ nhân vật chưa đủ thuyết phục, lạm dụng mô-típ quen thuộc, lỗ hổng logic...).
+     + [Đánh giá chung]: Tổng kết giá trị tổng thể của tác phẩm và đối tượng khán giả phù hợp.
+   - CẤM TUYỆT ĐỐI các mẫu câu sáo rỗng, rập khuôn như: "bài học ý nghĩa về tình thân, lòng trung thành và khát vọng vượt lên nghịch cảnh", "cân bằng tốt giữa tính kịch tính với chiều sâu cảm xúc", "mang đến trải nghiệm giải trí chất lượng".
 6. "criticConsensus": Nhận định phê bình tiếng Việt phản ánh đúng mức điểm thực tế.
 7. "audienceSentiment": Cảm nhận khán giả tiếng Việt phản ánh đúng mức điểm thực tế.
 8. "contentAdvisory": Phân tích cảnh báo nội dung THỰC TẾ của CHÍNH BỘ PHIM NÀY (không dùng công thức chung, không suy diễn theo thể loại) dựa trên kiến thức thực sự của bạn về phim:
@@ -1362,7 +1717,7 @@ Trả về duy nhất chuỗi JSON hợp lệ (không kèm markdown format):
   "englishTitle": "Tên tiếng Anh chuẩn quốc tế",
   "synopsis": "Tóm tắt ngắn gọn KHÔNG SPOILER tối đa 60 chữ phong cách Netflix",
   "detailedPlot": "Tóm tắt toàn bộ cốt truyện đầy đủ chi tiết trọn vẹn từ đầu đến kết cục (tối đa 300 chữ)",
-  "filmReview": "Bài phê bình và nhận định phim chuyên sâu, nêu bật ý nghĩa và điểm tốt nổi bật (tối đa 200 chữ)",
+  "filmReview": "Bài phê bình điện ảnh đa chiều sắc sảo gồm cả điểm sáng lẫn hạn chế/điểm trừ (140-200 chữ tiếng Việt)",
   "criticConsensus": "Nhận định phê bình tiếng Việt",
   "audienceSentiment": "Cảm nhận khán giả tiếng Việt",
   "contentAdvisory": {

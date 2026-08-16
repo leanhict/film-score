@@ -102,9 +102,7 @@ Trả về duy nhất định dạng JSON (không dùng markdown codeblock, khô
   "poster": "URL ảnh poster thực tế nếu có hoặc URL placeholder đẹp",
   "backdrop": "URL ảnh banner",
   "trailerUrl": "URL trailer youtube chính thức hoặc link tìm kiếm",
-  "synopsis": "Tóm tắt ngắn gọn KHÔNG SPOILER (tối đa 60 chữ) theo phong cách chú thích phim Netflix / rạp chiếu, giới thiệu tiền đề câu chuyện mà tuyệt đối không tiết lộ plot twist hay kết cục",
-  "detailedPlot": "Tóm tắt TOÀN BỘ cốt truyện từ đầu đến cuối ĐẦY ĐỦ TRỌN VẸN VÀ CHI TIẾT TRONG PHẠM VI TỐI ĐA 300 CHỮ (khoảng 220 - 280 từ tiếng Việt), tuyệt đối không dừng giữa chừng hay tóm tắt sơ sài. Phải tóm lược mạch lạc 4 giai đoạn: 1. Mở đầu & bối cảnh -> 2. Diễn biến mâu thuẫn -> 3. Nút thắt / Biến cố cao trào -> 4. Kết cục trọn vẹn và số phận cuối cùng của các nhân vật chính.",
-  "filmReview": "Bài phê bình và nhận định phim chuyên sâu (tối đa 200 từ tiếng Việt): Nhận xét đánh giá tổng quan, phân tích những thông điệp và ý nghĩa nhân văn/nghệ thuật sâu sắc của tác phẩm, nêu bật các điểm tốt nổi trội (chỉ đạo đạo diễn, diễn xuất, kịch bản, âm nhạc, góc quay) và lý do phim xứng đáng thưởng thức.",
+  "filmReview": "Bài phê bình và nhận định điện ảnh ĐA CHIỀU, KHÁCH QUAN (140-200 từ tiếng Việt) theo phong cách nhà phê bình điện ảnh chuyên nghiệp (Variety, Roger Ebert): Phân tích ĐO NI ĐÓNG GIÀY cho riêng tác phẩm này. BẮT BUỘC ĐÁNH GIÁ 2 MẶT CÂN BẰNG (CẢ KHEN LẪN CHÊ / ĐIỂM TRỪ), tuyệt đối không chỉ khen một chiều! Nêu rõ: 1. Góc nhìn nghệ thuật & điểm sáng nổi bật (ý tưởng, diễn xuất, kỹ xảo, âm thanh, thông điệp); 2. Hạn chế, hạt sạn & điểm trừ cần cân nhắc (kịch bản hồi kết vội vã, nhịp chùng xuống, động cơ nhân vật gượng gạo, mô-típ sáo mòn, lỗ hổng logic); 3. Tổng kết đối tượng khán giả phù hợp. TUYỆT ĐỐI CẤM các mẫu câu sáo rỗng rập khuôn ('bài học ý nghĩa về tình thân, lòng trung thành', 'cân bằng tốt giữa kịch tính và cảm xúc', 'trải nghiệm giải trí chất lượng').",
   "criticConsensus": "Nhận định tổng quan của giới phê bình bằng tiếng Việt phản ánh đúng mức điểm",
   "audienceSentiment": "Cảm nhận của khán giả đại chúng bằng tiếng Việt phản ánh đúng mức điểm",
   "ratings": {

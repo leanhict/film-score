@@ -6,7 +6,7 @@ import { isAdvisoryEligible } from '../utils/ageRatingAdvisory';
 import { AgeRatingDetailModal } from './AgeRatingDetailModal';
 import { AudioPlotReader } from './AudioPlotReader';
 import { ScoreBadge } from './ScoreBadge';
-import { fetchMovieById } from '../services/movieDataService';
+import { fetchMovieById, generateFallbackFilmReview } from '../services/movieDataService';
 import { X, Play, Bookmark, Award, Film, Clock, Calendar, Tv, DollarSign, Quote, Sparkles, Users, Building2, Globe, Info } from 'lucide-react';
 import './MovieDetailModal.css';
 
@@ -252,22 +252,26 @@ export function MovieDetailModal({
           )}
 
           {/* THẺ PHÊ BÌNH PHIM (TỐI ĐA 200 TỪ) */}
-          {(activeMovie.filmReview || activeMovie.movieReview) && (
-            <div className="modal-film-review-card">
-              <div className="film-review-header">
-                <div className="film-review-title-wrap">
-                  <div className="film-review-icon-badge">
-                    <Sparkles size={16} />
+          {(() => {
+            const reviewText = activeMovie.filmReview || activeMovie.movieReview || generateFallbackFilmReview(activeMovie);
+            if (!reviewText) return null;
+            return (
+              <div className="modal-film-review-card">
+                <div className="film-review-header">
+                  <div className="film-review-title-wrap">
+                    <div className="film-review-icon-badge">
+                      <Sparkles size={16} />
+                    </div>
+                    <h4 className="film-review-heading">Phê bình phim</h4>
                   </div>
-                  <h4 className="film-review-heading">Phê bình phim</h4>
+                  <span className="film-review-tag">Đánh giá Đa chiều</span>
                 </div>
-                <span className="film-review-tag">Góc nhìn & Ý nghĩa</span>
+                <p className="film-review-body">
+                  {formatFilmReview(reviewText, 200)}
+                </p>
               </div>
-              <p className="film-review-body">
-                {formatFilmReview(activeMovie.filmReview || activeMovie.movieReview || activeMovie.criticConsensus, 200)}
-              </p>
-            </div>
-          )}
+            );
+          })()}
 
           {/* TÓM TẮT DIỄN BIẾN & GIỌNG ĐỌC AI */}
           {(activeMovie.detailedPlot || activeMovie.synopsis) && (

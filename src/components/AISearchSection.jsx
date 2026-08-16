@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { searchMovieWithGemini, loadCandidateDetails } from '../services/geminiService.js';
+import { generateFallbackFilmReview } from '../services/movieDataService.js';
 import { ScoreBadge } from './ScoreBadge.jsx';
 import { calculateUnifiedScore, getMovieBadge } from '../services/scoreEngine.js';
 import { resolveMovieTitles } from '../utils/movieTitleResolver.js';
@@ -566,22 +567,26 @@ export function AISearchSection({
                       )}
 
                       {/* THẺ PHÊ BÌNH PHIM (TỐI ĐA 200 TỪ) */}
-                      {(searchResult.filmReview || searchResult.movieReview) && (
-                        <div className="modal-film-review-card">
-                          <div className="film-review-header">
-                            <div className="film-review-title-wrap">
-                              <div className="film-review-icon-badge">
-                                <Sparkles size={16} />
+                      {(() => {
+                        const reviewText = searchResult.filmReview || searchResult.movieReview || generateFallbackFilmReview(searchResult);
+                        if (!reviewText) return null;
+                        return (
+                          <div className="modal-film-review-card">
+                            <div className="film-review-header">
+                              <div className="film-review-title-wrap">
+                                <div className="film-review-icon-badge">
+                                  <Sparkles size={16} />
+                                </div>
+                                <h4 className="film-review-heading">Phê bình phim</h4>
                               </div>
-                              <h4 className="film-review-heading">Phê bình phim</h4>
+                              <span className="film-review-tag">Đánh giá Đa chiều</span>
                             </div>
-                            <span className="film-review-tag">Góc nhìn & Ý nghĩa</span>
+                            <p className="film-review-body">
+                              {formatFilmReview(reviewText, 200)}
+                            </p>
                           </div>
-                          <p className="film-review-body">
-                            {formatFilmReview(searchResult.filmReview || searchResult.movieReview || searchResult.criticConsensus, 200)}
-                          </p>
-                        </div>
-                      )}
+                        );
+                      })()}
 
                       {/* TÓM TẮT DIỄN BIẾN & GIỌNG ĐỌC AI */}
                       {(searchResult.detailedPlot || searchResult.synopsis) && (
