@@ -124,7 +124,7 @@
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-full);
   color: #fff;
-  font-size: 0.9rem;
+  font-size: 16px;
   transition: all var(--transition-fast);
 }
 
@@ -583,7 +583,7 @@
 
   .nav-search-input {
     padding: 8px 28px 8px 34px;
-    font-size: 0.8rem;
+    font-size: 16px;
     height: 36px;
   }
 
@@ -650,8 +650,8 @@
 
   .nav-search-input {
     padding: 6px 24px 6px 30px;
-    font-size: 0.76rem;
-    height: 32px;
+    font-size: 16px;
+    height: 34px;
   }
 
   .nav-search-btn {

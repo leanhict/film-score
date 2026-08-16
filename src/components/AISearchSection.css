@@ -78,7 +78,7 @@
   border: 1.5px solid var(--border-subtle);
   border-radius: var(--radius-md);
   color: #fff;
-  font-size: 0.95rem;
+  font-size: 16px;
   transition: all var(--transition-fast);
 }
 
