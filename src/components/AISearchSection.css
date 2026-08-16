@@ -318,20 +318,15 @@
 }
 
 .candidates-scroll-row {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
   gap: 6px;
   max-height: 180px;
   overflow-y: auto;
   padding-right: 2px;
   padding-bottom: 2px;
   scrollbar-width: thin;
-}
-
-@media (max-width: 520px) {
-  .candidates-scroll-row {
-    grid-template-columns: 1fr;
-  }
 }
 
 .candidate-card {
@@ -343,12 +338,18 @@
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   cursor: pointer;
-  width: 100%;
+  flex: 1 1 calc(50% - 3px);
   min-width: 0;
   box-sizing: border-box;
   overflow: hidden;
   transition: all var(--transition-fast);
   text-align: left;
+}
+
+@media (max-width: 520px) {
+  .candidate-card {
+    flex-basis: 100%;
+  }
 }
 
 .candidate-card:hover {

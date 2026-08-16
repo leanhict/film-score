@@ -14,7 +14,8 @@ import {
   formatDetailedPlot, 
   formatFilmReview, 
   parseYearToNumber,
-  calculateRelevance 
+  calculateRelevance,
+  compareCandidates
 } from '../utils/searchUtils.js';
 import { resolveMovieTitles } from '../utils/movieTitleResolver.js';
 
@@ -505,22 +506,8 @@ export async function searchMovieCandidates(rawQuery) {
   const minThreshold = 8000;
   list = list.filter(cand => (cand.relevanceScore || 0) >= minThreshold);
 
-  // Sắp xếp danh sách ứng viên sơ bộ theo ĐỘ LIÊN QUAN & KHỚP TÊN:
-  list.sort((a, b) => {
-    const scoreA = a.relevanceScore || 0;
-    const scoreB = b.relevanceScore || 0;
-    if (scoreB !== scoreA) {
-      return scoreB - scoreA;
-    }
-    const rateA = parseFloat(a.imdbRating) || 0;
-    const rateB = parseFloat(b.imdbRating) || 0;
-    if (rateB !== rateA) {
-      return rateB - rateA;
-    }
-    const yearA = parseYearToNumber(a.year);
-    const yearB = parseYearToNumber(b.year);
-    return yearB - yearA;
-  });
+  // Sắp xếp danh sách ứng viên sơ bộ: KHỚP TÊN -> NĂM SẢN XUẤT -> ĐIỂM IMDB
+  list.sort(compareCandidates);
 
   // 5. ĐỒNG BỘ ĐIỂM SỐ IMDB VÀ NĂM CHÍNH XÁC 100% TỪ OMDB CHO CÁC ỨNG VIÊN
   const topCandidates = list.slice(0, 10);
@@ -931,6 +918,24 @@ export async function fetchMovieById(id) {
 }
 
 /**
+ * Nếu OMDb chưa có điểm IMDb thực tế (phim mới/chưa phát hành), dùng tạm điểm đã biết
+ * từ candidate (điểm IMDb thực hoặc dự phòng TMDB vote) để khu chi tiết không hiển thị N/A
+ * trong khi danh sách ứng viên đã hiển thị điểm.
+ */
+export function applyFallbackImdbRating(movieDetails, fallbackRating) {
+  if (!movieDetails?.ratings || movieDetails.ratings.imdb != null || !fallbackRating) return;
+  const imdb = parseFloat(fallbackRating);
+  if (isNaN(imdb)) return;
+  movieDetails.ratings.imdb = imdb;
+  if (movieDetails.ratings.rtAudience == null) {
+    movieDetails.ratings.rtAudience = imdb >= 8.0 ? Math.min(98, Math.round(imdb * 10 + 3))
+      : imdb >= 7.0 ? Math.round(imdb * 10 + 2)
+      : imdb >= 5.0 ? Math.round(imdb * 10 - 2)
+      : Math.max(10, Math.round(imdb * 10 - 5));
+  }
+}
+
+/**
  * Gọi OMDb API để lấy dữ liệu thực tế 100% từ IMDb, RT và Metacritic
  */
 export async function fetchLiveMovieRatings(query, year = '') {
@@ -983,6 +988,9 @@ export async function fetchLiveMovieRatings(query, year = '') {
     movieDetails.backdrop = bestCandidate.poster;
   }
 
+  // Phim chưa có điểm IMDb thực tế (chưa phát hành) nhưng candidate đã có điểm tạm (TMDB vote) -> đồng bộ để tránh N/A ở khu chi tiết trong khi danh sách ứng viên vẫn hiển thị điểm
+  applyFallbackImdbRating(movieDetails, bestCandidate.imdbRating);
+
   // Đồng bộ năm sản xuất và điểm số chính xác từ movieDetails sang candidates
   if (movieDetails && movieDetails.year) {
     const verifiedYear = parseYearToNumber(movieDetails.year);
@@ -997,25 +1005,11 @@ export async function fetchLiveMovieRatings(query, year = '') {
     }
   }
 
-  // Đảm bảo danh sách ứng viên được sắp xếp lại chuẩn xác theo độ khớp tên & liên quan sau khi đã đồng bộ
+  // Đảm bảo danh sách ứng viên được sắp xếp lại chuẩn xác sau khi đã đồng bộ năm & điểm số
   candidates.forEach(c => {
     c.relevanceScore = calculateRelevance(c, query);
   });
-  candidates.sort((a, b) => {
-    const scoreA = a.relevanceScore || 0;
-    const scoreB = b.relevanceScore || 0;
-    if (scoreB !== scoreA) {
-      return scoreB - scoreA;
-    }
-    const rateA = parseFloat(a.imdbRating) || 0;
-    const rateB = parseFloat(b.imdbRating) || 0;
-    if (rateB !== rateA) {
-      return rateB - rateA;
-    }
-    const yearA = parseYearToNumber(a.year);
-    const yearB = parseYearToNumber(b.year);
-    return yearB - yearA;
-  });
+  candidates.sort(compareCandidates);
 
   return {
     movie: movieDetails,

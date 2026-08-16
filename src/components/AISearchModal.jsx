@@ -4,7 +4,7 @@ import { ScoreBadge } from './ScoreBadge';
 import { calculateUnifiedScore, getMovieBadge } from '../services/scoreEngine';
 import { resolveMovieTitles } from '../utils/movieTitleResolver';
 import { AudioPlotReader } from './AudioPlotReader';
-import { formatQuickSynopsis, formatDetailedPlot, formatFilmReview, parseYearToNumber, getAgeRatingBadge, formatMovieCredits } from '../utils/searchUtils';
+import { formatQuickSynopsis, formatDetailedPlot, formatFilmReview, parseYearToNumber, getAgeRatingBadge, formatMovieCredits, compareCandidates } from '../utils/searchUtils';
 import { isAdvisoryEligible } from '../utils/ageRatingAdvisory';
 import { AgeRatingDetailModal } from './AgeRatingDetailModal';
 import {
@@ -107,7 +107,7 @@ export function AISearchModal({
     if (!cand.imdbID || cand.imdbID === searchResult?.id) return;
     setIsSwitching(true);
     try {
-      const details = await loadCandidateDetails(cand.imdbID);
+      const details = await loadCandidateDetails(cand.imdbID, cand.imdbRating);
       setSearchResult(prev => {
         const prevCandidates = prev?.candidates || [];
         const verifiedYear = parseYearToNumber(details.year);
@@ -141,7 +141,7 @@ export function AISearchModal({
     }
   };
 
-  // Lọc và sắp xếp các candidate theo ĐỘ KHỚP TÊN & LIÊN QUAN (trùng tên lên đầu)
+  // Lọc và sắp xếp candidate: KHỚP TÊN -> NĂM SẢN XUẤT -> ĐIỂM IMDB
   const sortedCandidates = useMemo(() => {
     const rawList = searchResult?.candidates || [];
     if (!Array.isArray(rawList) || rawList.length === 0) return [];
@@ -153,21 +153,7 @@ export function AISearchModal({
       return hasPoster || hasCast || hasRating;
     });
 
-    return [...valid].sort((a, b) => {
-      const scoreA = a.relevanceScore || 0;
-      const scoreB = b.relevanceScore || 0;
-      if (scoreB !== scoreA) {
-        return scoreB - scoreA;
-      }
-      const rA = parseFloat(a.imdbRating) || 0;
-      const rB = parseFloat(b.imdbRating) || 0;
-      if (rB !== rA) {
-        return rB - rA;
-      }
-      const yA = parseYearToNumber(a.year);
-      const yB = parseYearToNumber(b.year);
-      return yB - yA;
-    });
+    return [...valid].sort(compareCandidates);
   }, [searchResult?.candidates]);
 
   if (!isOpen) return null;

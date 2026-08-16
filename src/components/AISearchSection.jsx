@@ -3,7 +3,7 @@ import { searchMovieWithGemini, loadCandidateDetails } from '../services/geminiS
 import { ScoreBadge } from './ScoreBadge.jsx';
 import { calculateUnifiedScore, getMovieBadge } from '../services/scoreEngine.js';
 import { resolveMovieTitles } from '../utils/movieTitleResolver.js';
-import { formatQuickSynopsis, formatDetailedPlot, formatFilmReview, parseYearToNumber, getAgeRatingBadge, formatMovieCredits } from '../utils/searchUtils.js';
+import { formatQuickSynopsis, formatDetailedPlot, formatFilmReview, parseYearToNumber, getAgeRatingBadge, formatMovieCredits, compareCandidates } from '../utils/searchUtils.js';
 import { isAdvisoryEligible } from '../utils/ageRatingAdvisory.js';
 import { AgeRatingDetailModal } from './AgeRatingDetailModal.jsx';
 import {
@@ -121,7 +121,7 @@ export function AISearchSection({
     if (!cand.imdbID || cand.imdbID === searchResult?.id) return;
     setIsSwitching(true);
     try {
-      const details = await loadCandidateDetails(cand.imdbID);
+      const details = await loadCandidateDetails(cand.imdbID, cand.imdbRating);
       // Đảm bảo tên phim sạch sẽ không bị working title
       const cleanTitle = cand.title || details.title;
       const verifiedYear = parseYearToNumber(details.year);
@@ -172,7 +172,7 @@ export function AISearchSection({
   const isUpcoming = searchResult && searchResult.year && searchResult.year > 2024 &&
     searchResult.ratings?.imdb === null && searchResult.ratings?.rtCritics === null;
 
-  // Lọc và sắp xếp các candidate theo ĐỘ KHỚP TÊN & LIÊN QUAN (trùng tên lên đầu)
+  // Lọc và sắp xếp candidate: KHỚP TÊN -> NĂM SẢN XUẤT -> ĐIỂM IMDB
   const sortedCandidates = useMemo(() => {
     const rawList = searchResult?.candidates || [];
     if (!Array.isArray(rawList) || rawList.length === 0) return [];
@@ -184,21 +184,7 @@ export function AISearchSection({
       return hasPoster || hasCast || hasRating;
     });
 
-    return [...valid].sort((a, b) => {
-      const scoreA = a.relevanceScore || 0;
-      const scoreB = b.relevanceScore || 0;
-      if (scoreB !== scoreA) {
-        return scoreB - scoreA;
-      }
-      const rA = parseFloat(a.imdbRating) || 0;
-      const rB = parseFloat(b.imdbRating) || 0;
-      if (rB !== rA) {
-        return rB - rA;
-      }
-      const yA = parseYearToNumber(a.year);
-      const yB = parseYearToNumber(b.year);
-      return yB - yA;
-    });
+    return [...valid].sort(compareCandidates);
   }, [searchResult?.candidates]);
 
   return (

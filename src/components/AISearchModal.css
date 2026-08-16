@@ -354,20 +354,15 @@
 }
 
 .candidates-list-scroll {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
   gap: 6px;
   max-height: 180px;
   overflow-y: auto;
   padding-right: 2px;
   padding-bottom: 2px;
   scrollbar-width: thin;
-}
-
-@media (max-width: 520px) {
-  .candidates-list-scroll {
-    grid-template-columns: 1fr;
-  }
 }
 
 .candidate-pill-card {
@@ -379,11 +374,17 @@
   border: 1px solid var(--border-subtle);
   border-radius: 6px;
   cursor: pointer;
-  width: 100%;
+  flex: 1 1 calc(50% - 3px);
   min-width: 0;
   box-sizing: border-box;
   overflow: hidden;
   transition: all var(--transition-fast);
+}
+
+@media (max-width: 520px) {
+  .candidate-pill-card {
+    flex-basis: 100%;
+  }
 }
 
 .candidate-pill-card:hover {

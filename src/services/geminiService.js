@@ -4,7 +4,7 @@
  * Kết hợp Live API Data + Google Gemini AI Language Model
  */
 
-import { fetchLiveMovieRatings, enhanceWithGemini, fetchMovieById, sanitizeContentAdvisory } from './movieDataService.js';
+import { fetchLiveMovieRatings, enhanceWithGemini, fetchMovieById, sanitizeContentAdvisory, applyFallbackImdbRating } from './movieDataService.js';
 import { resolveMovieTitles } from '../utils/movieTitleResolver.js';
 import { formatQuickSynopsis, formatDetailedPlot, formatFilmReview } from '../utils/searchUtils.js';
 
@@ -64,8 +64,9 @@ export async function searchMovieWithGemini(query, customApiKey = '') {
 /**
  * Lấy chi tiết của một ứng viên cụ thể theo IMDb ID
  */
-export async function loadCandidateDetails(imdbID) {
+export async function loadCandidateDetails(imdbID, fallbackImdbRating = null) {
   const movie = await fetchMovieById(imdbID);
+  applyFallbackImdbRating(movie, fallbackImdbRating);
   const enhanced = await enhanceWithGemini(movie);
   return {
     ...enhanced,

@@ -568,6 +568,28 @@ export function calculateRelevance(cand, rawQuery = '', targetYear = null, searc
 }
 
 /**
+ * So sánh 2 ứng viên theo đúng thứ tự ưu tiên khi hiển thị kết quả tra cứu:
+ * 1. Bậc khớp tên với từ khóa tìm kiếm (trùng tên lên đầu)
+ * 2. Năm sản xuất mới nhất
+ * 3. Điểm IMDb cao nhất
+ *
+ * relevanceScore được gom về bậc 10000 (đúng bằng khoảng cách giữa các mức khớp tên trong
+ * calculateRelevance) để các điểm thưởng phụ (lượt vote, điểm IMDb, poster, rank - tối đa ~6200)
+ * không đẩy ứng viên vượt bậc và lấn át tiêu chí năm sản xuất.
+ */
+export function compareCandidates(a, b) {
+  const tierA = Math.floor((a?.relevanceScore || 0) / 10000);
+  const tierB = Math.floor((b?.relevanceScore || 0) / 10000);
+  if (tierB !== tierA) return tierB - tierA;
+
+  const yearA = parseYearToNumber(a?.year);
+  const yearB = parseYearToNumber(b?.year);
+  if (yearB !== yearA) return yearB - yearA;
+
+  return (parseFloat(b?.imdbRating) || 0) - (parseFloat(a?.imdbRating) || 0);
+}
+
+/**
  * Trả về huy hiệu cảnh báo độ tuổi xem phim chuẩn phân loại điện ảnh Việt Nam & Quốc tế
  */
 export function getAgeRatingBadge(movie) {
