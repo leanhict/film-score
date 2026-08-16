@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { calculateUnifiedScore, getMovieBadge } from '../services/scoreEngine';
 import { resolveMovieTitles } from '../utils/movieTitleResolver';
 import { formatQuickSynopsis, formatDetailedPlot, formatFilmReview, getAgeRatingBadge, formatMovieCredits } from '../utils/searchUtils';
@@ -6,6 +6,7 @@ import { isAdvisoryEligible } from '../utils/ageRatingAdvisory';
 import { AgeRatingDetailModal } from './AgeRatingDetailModal';
 import { AudioPlotReader } from './AudioPlotReader';
 import { ScoreBadge } from './ScoreBadge';
+import { fetchMovieById } from '../services/movieDataService';
 import { X, Play, Bookmark, Award, Film, Clock, Calendar, Tv, DollarSign, Quote, Sparkles, Users, Building2, Globe, Info } from 'lucide-react';
 import './MovieDetailModal.css';
 
@@ -19,9 +20,37 @@ export function MovieDetailModal({
 }) {
   if (!movie) return null;
 
+  const [currentMovie, setCurrentMovie] = useState(movie);
   const [isAgeAdvisoryOpen, setIsAgeAdvisoryOpen] = useState(false);
-  const unifiedScore = calculateUnifiedScore(movie.ratings, weights);
-  const badge = getMovieBadge(movie.ratings);
+
+  useEffect(() => {
+    setCurrentMovie(movie);
+    if (!movie) return;
+
+    // Tự động tải thông tin Diễn viên, Đạo diễn thật từ TMDB / IMDb nếu thiếu
+    const needsCredits = (!movie.cast || movie.cast.length === 0 || movie.director === 'Đạo diễn Netflix' || !movie.director) && movie.id;
+    if (needsCredits) {
+      let isMounted = true;
+      fetchMovieById(movie.id)
+        .then(fullData => {
+          if (isMounted && fullData) {
+            setCurrentMovie(prev => ({
+              ...prev,
+              ...fullData,
+              ratings: fullData.ratings?.imdb ? fullData.ratings : prev.ratings
+            }));
+          }
+        })
+        .catch(err => {
+          console.warn('Không tải được credits chi tiết:', err);
+        });
+      return () => { isMounted = false; };
+    }
+  }, [movie]);
+
+  const activeMovie = currentMovie || movie;
+  const unifiedScore = calculateUnifiedScore(activeMovie.ratings, weights);
+  const badge = getMovieBadge(activeMovie.ratings);
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -45,8 +74,8 @@ export function MovieDetailModal({
         {/* HERO BANNER WITH OVERLAY */}
         <div className="modal-hero-banner">
           <img
-            src={movie.backdrop || movie.poster}
-            alt={movie.title}
+            src={activeMovie.backdrop || activeMovie.poster}
+            alt={activeMovie.title}
             className="modal-banner-img"
             onError={(e) => {
               e.target.onerror = null;
@@ -65,9 +94,9 @@ export function MovieDetailModal({
               </div>
             )}
             {(() => {
-              const genresList = Array.isArray(movie.genres) 
-                ? movie.genres 
-                : (typeof movie.genres === 'string' ? movie.genres.split(',').map(g => g.trim()).filter(Boolean) : []);
+              const genresList = Array.isArray(activeMovie.genres) 
+                ? activeMovie.genres 
+                : (typeof activeMovie.genres === 'string' ? activeMovie.genres.split(',').map(g => g.trim()).filter(Boolean) : []);
               return genresList.length > 0 ? (
                 <div className="modal-banner-genres">
                   {genresList.map((genre, idx) => (
@@ -85,8 +114,8 @@ export function MovieDetailModal({
           <div className="modal-header-info-wrap">
             <div className="modal-poster-wrap">
               <img
-                src={movie.poster}
-                alt={movie.title}
+                src={activeMovie.poster}
+                alt={activeMovie.title}
                 className="modal-poster-img"
                 onError={(e) => {
                   e.target.onerror = null;
@@ -98,8 +127,8 @@ export function MovieDetailModal({
             <div className="modal-banner-info">
               {/* HÀNG CẢNH BÁO ĐỘ TUỔI */}
               {(() => {
-                const ageBadge = getAgeRatingBadge(movie);
-                const eligible = isAdvisoryEligible(movie);
+                const ageBadge = getAgeRatingBadge(activeMovie);
+                const eligible = isAdvisoryEligible(activeMovie);
                 return ageBadge ? (
                   <div className="modal-age-warning-row">
                     <span 
@@ -130,7 +159,7 @@ export function MovieDetailModal({
               })()}
 
               {(() => {
-                const modalTitles = resolveMovieTitles(movie);
+                const modalTitles = resolveMovieTitles(activeMovie);
                 return (
                   <>
                     <h2 className="modal-movie-title">
@@ -144,15 +173,15 @@ export function MovieDetailModal({
               })()}
 
               <div className="modal-meta-grid">
-                {movie.year && <span><Calendar size={14} /> {movie.year}</span>}
-                <span><Clock size={14} /> {movie.runtime}</span>
+                {activeMovie.year && <span><Calendar size={14} /> {activeMovie.year}</span>}
+                <span><Clock size={14} /> {activeMovie.runtime}</span>
               </div>
 
-              {movie.trailerUrl && (
+              {activeMovie.trailerUrl && (
                 <div className="modal-cta-row">
                   <button
                     className="modal-btn modal-btn-play"
-                    onClick={() => onOpenTrailer && onOpenTrailer(movie)}
+                    onClick={() => onOpenTrailer && onOpenTrailer(activeMovie)}
                   >
                     <Play size={16} /> Xem Trailer
                   </button>
@@ -167,17 +196,17 @@ export function MovieDetailModal({
             <div className="modal-scores-cluster">
               <ScoreBadge type="unified" score={unifiedScore} size="large" />
               <div className="modal-source-badges">
-                <ScoreBadge type="imdb" score={movie.ratings?.imdb} votes={movie.ratings?.imdbVotes} showSubtitle={true} />
-                <ScoreBadge type="rtCritics" score={movie.ratings?.rtCritics} showSubtitle={true} />
-                <ScoreBadge type="rtAudience" score={movie.ratings?.rtAudience} showSubtitle={true} />
-                <ScoreBadge type="metacritic" score={movie.ratings?.metascore} showSubtitle={true} />
+                <ScoreBadge type="imdb" score={activeMovie.ratings?.imdb} votes={activeMovie.ratings?.imdbVotes} showSubtitle={true} />
+                <ScoreBadge type="rtCritics" score={activeMovie.ratings?.rtCritics} showSubtitle={true} />
+                <ScoreBadge type="rtAudience" score={activeMovie.ratings?.rtAudience} showSubtitle={true} />
+                <ScoreBadge type="metacritic" score={activeMovie.ratings?.metascore} showSubtitle={true} />
               </div>
             </div>
           </div>
 
           {/* KHU VỰC THÔNG TIN DIỄN VIÊN, ĐẠO DIỄN, HÃNG SẢN XUẤT VÀ QUỐC GIA (DƯỚI BẢNG ĐIỂM NGUỒN UY TÍN) */}
           {(() => {
-            const credits = formatMovieCredits(movie);
+            const credits = formatMovieCredits(activeMovie);
             return (
               <div className="modal-credits-section">
                 <div className="credit-row">
@@ -203,12 +232,12 @@ export function MovieDetailModal({
                   </div>
                 )}
 
-                {movie.country && (
+                {activeMovie.country && (
                   <div className="credit-row">
                     <span className="credit-label">
                       <Globe size={14} className="credit-icon" /> Quốc gia:
                     </span>
-                    <span className="credit-value">{movie.country}</span>
+                    <span className="credit-value">{activeMovie.country}</span>
                   </div>
                 )}
               </div>
@@ -216,14 +245,14 @@ export function MovieDetailModal({
           })()}
 
           {/* GIỚI THIỆU PHIM (NETFLIX-STYLE) */}
-          {movie.synopsis && (
+          {activeMovie.synopsis && (
             <div className="modal-quick-synopsis-box">
-              <span className="quick-synopsis-tag">Giới thiệu phim:</span> {formatQuickSynopsis(movie.synopsis, 60)}
+              <span className="quick-synopsis-tag">Giới thiệu phim:</span> {formatQuickSynopsis(activeMovie.synopsis, 60)}
             </div>
           )}
 
           {/* THẺ PHÊ BÌNH PHIM (TỐI ĐA 200 TỪ) */}
-          {(movie.filmReview || movie.movieReview) && (
+          {(activeMovie.filmReview || activeMovie.movieReview) && (
             <div className="modal-film-review-card">
               <div className="film-review-header">
                 <div className="film-review-title-wrap">
@@ -235,29 +264,29 @@ export function MovieDetailModal({
                 <span className="film-review-tag">Góc nhìn & Ý nghĩa</span>
               </div>
               <p className="film-review-body">
-                {formatFilmReview(movie.filmReview || movie.movieReview || movie.criticConsensus, 200)}
+                {formatFilmReview(activeMovie.filmReview || activeMovie.movieReview || activeMovie.criticConsensus, 200)}
               </p>
             </div>
           )}
 
           {/* TÓM TẮT DIỄN BIẾN & GIỌNG ĐỌC AI */}
-          {(movie.detailedPlot || movie.synopsis) && (
+          {(activeMovie.detailedPlot || activeMovie.synopsis) && (
             <div className="modal-section synopsis-section">
               <AudioPlotReader
-                text={formatDetailedPlot(movie.detailedPlot || movie.synopsis, 300)}
+                text={formatDetailedPlot(activeMovie.detailedPlot || activeMovie.synopsis, 300)}
                 title="Tóm tắt diễn biến"
-                spoilerTag={movie.detailedPlot ? "Spoiler" : ""}
+                spoilerTag={activeMovie.detailedPlot ? "Spoiler" : ""}
                 defaultExpanded={false}
               />
             </div>
           )}
 
           {/* DÀN DIỄN VIÊN CHÍNH */}
-          {movie.cast && movie.cast.length > 0 && (
+          {activeMovie.cast && activeMovie.cast.length > 0 && (
             <div className="modal-cast-section">
               <h4 className="section-mini-title">Dàn Diễn Viên Chính</h4>
               <div className="cast-tags-list">
-                {movie.cast.map((actor, idx) => (
+                {activeMovie.cast.map((actor, idx) => (
                   <span key={idx} className="cast-pill">{actor}</span>
                 ))}
               </div>
@@ -266,32 +295,32 @@ export function MovieDetailModal({
 
           {/* BOX OFFICE & AWARDS & STREAMING */}
           <div className="modal-footer-stats">
-            {movie.boxOffice && (
+            {activeMovie.boxOffice && (
               <div className="stat-card">
                 <DollarSign size={18} className="stat-icon" />
                 <div>
                   <span className="stat-label">Doanh Thu Phòng Vé</span>
-                  <span className="stat-val">{movie.boxOffice}</span>
+                  <span className="stat-val">{activeMovie.boxOffice}</span>
                 </div>
               </div>
             )}
 
-            {movie.awards && (
+            {activeMovie.awards && (
               <div className="stat-card">
                 <Award size={18} className="stat-icon award-color" />
                 <div>
                   <span className="stat-label">Giải Thưởng & Thành Tựu</span>
-                  <span className="stat-val">{movie.awards}</span>
+                  <span className="stat-val">{activeMovie.awards}</span>
                 </div>
               </div>
             )}
 
-            {movie.streaming && movie.streaming.length > 0 && (
+            {activeMovie.streaming && activeMovie.streaming.length > 0 && (
               <div className="stat-card">
                 <Tv size={18} className="stat-icon stream-color" />
                 <div>
                   <span className="stat-label">Nền Tảng Chiếu Trực Tuyến</span>
-                  <span className="stat-val">{movie.streaming.join(', ')}</span>
+                  <span className="stat-val">{activeMovie.streaming.join(', ')}</span>
                 </div>
               </div>
             )}
@@ -302,7 +331,7 @@ export function MovieDetailModal({
       {/* MODAL CHI TIẾT CẢNH BÁO ĐỘ TUỔI & MỐC THỜI GIAN */}
       {isAgeAdvisoryOpen && (
         <AgeRatingDetailModal
-          movie={movie}
+          movie={activeMovie}
           onClose={() => setIsAgeAdvisoryOpen(false)}
         />
       )}

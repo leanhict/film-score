@@ -4,7 +4,7 @@
  * Kết hợp Live API Data + Google Gemini AI Language Model
  */
 
-import { fetchLiveMovieRatings, enhanceWithGemini, fetchMovieById } from './movieDataService.js';
+import { fetchLiveMovieRatings, enhanceWithGemini, fetchMovieById, sanitizeContentAdvisory } from './movieDataService.js';
 import { resolveMovieTitles } from '../utils/movieTitleResolver.js';
 import { formatQuickSynopsis, formatDetailedPlot, formatFilmReview } from '../utils/searchUtils.js';
 
@@ -117,7 +117,25 @@ Trả về duy nhất định dạng JSON (không dùng markdown codeblock, khô
   "streaming": ["Apple TV+", "Netflix", "Galaxy Play"],
   "boxOffice": "Doanh thu phòng vé hoặc N/A",
   "awards": "Giải thưởng hoặc N/A",
-  "ageRating": "T18"
+  "ageRating": "T18",
+  "contentAdvisory": {
+    "verdict": "Câu giải thích lý do phân loại độ tuổi dựa trên nội dung THỰC TẾ của phim (không suy diễn theo thể loại)",
+    "parentalGuidance": "Khuyến nghị dành cho phụ huynh/người xem",
+    "stats": {
+      "language": { "count": 0, "level": "mild|moderate", "label": "Bình thường|Chửi thề / Gay gắt" }
+    },
+    "scenes": [
+      {
+        "category": "nudity|violence|horror",
+        "timestamp": "00:00:00 - 00:00:00",
+        "title": "Tên ngắn gọn của cảnh",
+        "description": "Mô tả cụ thể cảnh quay CÓ THẬT trong phim mà bạn biết chắc chắn (để mảng rỗng nếu không chắc chắn, TUYỆT ĐỐI KHÔNG bịa)",
+        "intensity": "mild|moderate|severe",
+        "intensityLabel": "Nhẹ|Vừa|Nặng",
+        "isSpoiler": false
+      }
+    ]
+  }
 }
 `;
 
@@ -162,6 +180,7 @@ Trả về duy nhất định dạng JSON (không dùng markdown codeblock, khô
     synopsis: formatQuickSynopsis(parsed.synopsis, 60),
     detailedPlot: formatDetailedPlot(parsed.detailedPlot, 300),
     filmReview: formatFilmReview(parsed.filmReview, 200),
+    contentAdvisory: sanitizeContentAdvisory(parsed.contentAdvisory),
     id: `ai-gemini-${Date.now()}`,
     candidates: [],
     source: 'Google Gemini AI Realtime Search',

@@ -556,90 +556,85 @@ export function generateSmartAdvisory(movie) {
     nudityCount = 0;
   }
 
-  // Tạo các mốc cảnh nóng nếu có
-  if (nudityCount > 0) {
-    const t1 = Math.round(totalMinutes * 0.22);
-    const t1End = t1 + 2;
-    scenes.push({
-      id: `gen-nudity-1`,
-      category: 'nudity',
-      categoryName: 'Cảnh nóng & Nhạy cảm',
-      categoryIcon: '🔥',
-      timestamp: `${formatMinToTime(t1)} - ${formatMinToTime(t1End)}`,
-      intensity: code === 'T18' ? 'severe' : 'moderate',
-      intensityLabel: code === 'T18' ? 'Nặng' : 'Vừa',
+  // Sinh đủ số mốc cảnh theo đúng số lượng đã công bố ở stats (tránh lệch giữa số đếm và danh sách thực tế)
+  const spreadTime = (startFrac, endFrac, i, count) => {
+    const frac = count <= 1 ? (startFrac + endFrac) / 2 : startFrac + (i * (endFrac - startFrac)) / (count - 1);
+    return Math.round(totalMinutes * frac);
+  };
+
+  const buildScenes = (category, count, [startFrac, endFrac], templates, dur) => {
+    const list = [];
+    for (let i = 0; i < count; i++) {
+      const t = spreadTime(startFrac, endFrac, i, count);
+      const tpl = templates[i % templates.length];
+      list.push({
+        id: `gen-${category}-${i + 1}`,
+        category,
+        categoryName: tpl.categoryName,
+        categoryIcon: tpl.icon,
+        timestamp: `${formatMinToTime(t)} - ${formatMinToTime(t + dur)}`,
+        intensity: code === 'T18' ? 'severe' : (i === 0 ? 'moderate' : 'mild'),
+        intensityLabel: code === 'T18' ? 'Nặng' : (i === 0 ? 'Vừa' : 'Nhẹ'),
+        title: tpl.title,
+        description: tpl.description(code),
+        isSpoiler: i % 2 === 1
+      });
+    }
+    return list;
+  };
+
+  const NUDITY_TEMPLATES = [
+    {
+      categoryName: 'Cảnh nóng & Nhạy cảm', icon: '🔥',
       title: 'Phân đoạn tình cảm thân mật giữa hai nhân vật chính',
-      description: `Cảnh quay thể hiện tình cảm nồng cháy trong không gian riêng tư với các cử chỉ âu yếm tiếp xúc cơ thể ${code === 'T18' ? 'kèm khoảnh khắc để lộ một phần cơ thể quyến rũ' : 'mang tính ước lệ nghệ thuật'}.`,
-      isSpoiler: false
-    });
-
-    if (nudityCount >= 2) {
-      const t2 = Math.round(totalMinutes * 0.65);
-      const t2End = t2 + 2;
-      scenes.push({
-        id: `gen-nudity-2`,
-        category: 'nudity',
-        categoryName: 'Cảnh nóng & Nhạy cảm',
-        categoryIcon: '🔥',
-        timestamp: `${formatMinToTime(t2)} - ${formatMinToTime(t2End)}`,
-        intensity: code === 'T18' ? 'severe' : 'mild',
-        intensityLabel: code === 'T18' ? 'Nặng' : 'Nhẹ',
-        title: 'Cảnh ân ái đẩy cao mâu thuẫn cảm xúc',
-        description: 'Hai nhân vật bộc lộ cảm xúc dồn nén qua cử chỉ ôm ấp và hôn đắm đuối trước khi bước vào biến cố cao trào của mạch phim.',
-        isSpoiler: true
-      });
+      description: (c) => `Cảnh quay thể hiện tình cảm nồng cháy trong không gian riêng tư với các cử chỉ âu yếm tiếp xúc cơ thể ${c === 'T18' ? 'kèm khoảnh khắc để lộ một phần cơ thể quyến rũ' : 'mang tính ước lệ nghệ thuật'}.`
+    },
+    {
+      categoryName: 'Cảnh nóng & Nhạy cảm', icon: '🔥',
+      title: 'Cảnh ân ái đẩy cao mâu thuẫn cảm xúc',
+      description: () => 'Hai nhân vật bộc lộ cảm xúc dồn nén qua cử chỉ ôm ấp và hôn đắm đuối trước khi bước vào biến cố cao trào của mạch phim.'
     }
-  }
+  ];
 
-  // Tạo các mốc cảnh bạo lực nếu có
-  if (violenceCount > 0) {
-    const tV1 = Math.round(totalMinutes * 0.35);
-    scenes.push({
-      id: `gen-vio-1`,
-      category: 'violence',
-      categoryName: 'Bạo lực & Đột kích',
-      categoryIcon: '⚔️',
-      timestamp: `${formatMinToTime(tV1)} - ${formatMinToTime(tV1 + 3)}`,
-      intensity: code === 'T18' ? 'severe' : 'moderate',
-      intensityLabel: code === 'T18' ? 'Nặng' : 'Vừa',
+  const VIOLENCE_TEMPLATES = [
+    {
+      categoryName: 'Bạo lực & Đột kích', icon: '⚔️',
       title: 'Xung đột vũ lực nổ ra giữa các phe phái',
-      description: `Màn đấu súng và cận chiến tay đôi căng thẳng với các đòn đánh mạnh bạo ${code === 'T18' ? 'làm nhiều người bị thương nặng và đổ máu' : 'gây chấn thương cho đối thủ'}.`,
-      isSpoiler: false
-    });
-
-    if (violenceCount >= 2) {
-      const tV2 = Math.round(totalMinutes * 0.82);
-      scenes.push({
-        id: `gen-vio-2`,
-        category: 'violence',
-        categoryName: 'Bạo lực cao trào',
-        categoryIcon: '⚔️',
-        timestamp: `${formatMinToTime(tV2)} - ${formatMinToTime(tV2 + 4)}`,
-        intensity: code === 'T18' ? 'severe' : 'moderate',
-        intensityLabel: code === 'T18' ? 'Nặng' : 'Vừa',
-        title: 'Trận quyết chiến sinh tử tại hồi kết',
-        description: 'Trận giao tranh đẫm máu hạ gục kẻ thù nguy hiểm nhất nhằm giải quyết dứt điểm toàn bộ ân oán và xung đột trong cốt truyện.',
-        isSpoiler: true
-      });
+      description: (c) => `Màn đấu súng và cận chiến tay đôi căng thẳng với các đòn đánh mạnh bạo ${c === 'T18' ? 'làm nhiều người bị thương nặng và đổ máu' : 'gây chấn thương cho đối thủ'}.`
+    },
+    {
+      categoryName: 'Bạo lực cao trào', icon: '⚔️',
+      title: 'Trận quyết chiến sinh tử tại hồi kết',
+      description: () => 'Trận giao tranh đẫm máu hạ gục kẻ thù nguy hiểm nhất nhằm giải quyết dứt điểm toàn bộ ân oán và xung đột trong cốt truyện.'
+    },
+    {
+      categoryName: 'Bạo lực & Rượt đuổi', icon: '⚔️',
+      title: 'Cuộc rượt đuổi và đấu súng căng thẳng',
+      description: () => 'Pha rượt đuổi tốc độ cao xen lẫn đấu súng dữ dội giữa các phe đối đầu, gây thương vong trên đường đi.'
     }
-  }
+  ];
 
-  // Tạo các mốc kinh dị / máu me nếu có
-  if (horrorCount > 0) {
-    const tH1 = Math.round(totalMinutes * 0.48);
-    scenes.push({
-      id: `gen-hor-1`,
-      category: 'horror',
-      categoryName: 'Kinh dị & Rùng rợn',
-      categoryIcon: '🩸',
-      timestamp: `${formatMinToTime(tH1)} - ${formatMinToTime(tH1 + 2)}`,
-      intensity: code === 'T18' ? 'severe' : 'moderate',
-      intensityLabel: code === 'T18' ? 'Nặng' : 'Vừa',
+  const HORROR_TEMPLATES = [
+    {
+      categoryName: 'Kinh dị & Rùng rợn', icon: '🩸',
       title: 'Phân đoạn jumpscare giật mình và phát hiện rùng rợn',
-      description: 'Âm thanh tĩnh lặng bị xé toạc bởi sự xuất hiện đột ngột của yếu tố nguy hiểm cùng vết máu và hiện trường gây sốc thị giác.',
-      isSpoiler: false
-    });
-  }
+      description: () => 'Âm thanh tĩnh lặng bị xé toạc bởi sự xuất hiện đột ngột của yếu tố nguy hiểm cùng vết máu và hiện trường gây sốc thị giác.'
+    },
+    {
+      categoryName: 'Kinh dị & Ám ảnh', icon: '🩸',
+      title: 'Hiện trường ám ảnh với hình ảnh máu me',
+      description: () => 'Nhân vật phát hiện hiện trường rùng rợn với dấu vết máu me và hình ảnh biến dạng gây ám ảnh tâm lý.'
+    },
+    {
+      categoryName: 'Kinh dị & Truy đuổi', icon: '🩸',
+      title: 'Cảnh truy đuổi kinh hoàng đẩy cao kịch tính',
+      description: () => 'Nhân vật bị thế lực nguy hiểm truy đuổi trong không gian tối tăm, xen lẫn tiếng gào thét và hình ảnh gây sốc.'
+    }
+  ];
+
+  scenes.push(...buildScenes('nudity', nudityCount, [0.18, 0.68], NUDITY_TEMPLATES, 2));
+  scenes.push(...buildScenes('violence', violenceCount, [0.30, 0.85], VIOLENCE_TEMPLATES, 3));
+  scenes.push(...buildScenes('horror', horrorCount, [0.40, 0.92], HORROR_TEMPLATES, 2));
 
   // Sắp xếp các cảnh theo mốc thời gian tăng dần
   scenes.sort((a, b) => a.timestamp.localeCompare(b.timestamp));

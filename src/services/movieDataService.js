@@ -1239,6 +1239,62 @@ function generateAccurateConsensus(title, imdb, rtCritics, metascore) {
 /**
  * Tích hợp Gemini AI để nâng cao chất lượng dịch và phân tích cốt truyện dạng Spoiler
  */
+const CONTENT_CATEGORY_META = {
+  nudity: { categoryName: 'Cảnh nóng & Nhạy cảm', categoryIcon: '🔥' },
+  violence: { categoryName: 'Bạo lực & Đánh đấm', categoryIcon: '⚔️' },
+  horror: { categoryName: 'Kinh dị & Rùng rợn', categoryIcon: '🩸' }
+};
+
+/**
+ * Chuẩn hóa dữ liệu cảnh báo nội dung do Gemini trả về, đồng thời TỰ TÍNH LẠI số đếm
+ * từ chính danh sách "scenes" thực tế để đảm bảo số liệu hiển thị luôn khớp 100%
+ * với danh sách mốc thời gian (tránh lệch số như công thức suy diễn cũ theo thể loại).
+ */
+export function sanitizeContentAdvisory(raw) {
+  if (!raw || !Array.isArray(raw.scenes)) return null;
+
+  const scenes = raw.scenes
+    .filter(s => s && CONTENT_CATEGORY_META[s.category])
+    .map((s, idx) => ({
+      id: `gemini-${s.category}-${idx + 1}`,
+      category: s.category,
+      categoryName: CONTENT_CATEGORY_META[s.category].categoryName,
+      categoryIcon: CONTENT_CATEGORY_META[s.category].categoryIcon,
+      timestamp: s.timestamp || '00:00:00 - 00:00:00',
+      intensity: ['mild', 'moderate', 'severe'].includes(s.intensity) ? s.intensity : 'moderate',
+      intensityLabel: s.intensityLabel || 'Vừa',
+      title: s.title || 'Cảnh đáng chú ý',
+      description: s.description || '',
+      isSpoiler: !!s.isSpoiler
+    }));
+
+  if (scenes.length === 0) return null;
+
+  const countFor = (cat) => scenes.filter(s => s.category === cat).length;
+  const levelFor = (count) => (count === 0 ? 'none' : count === 1 ? 'mild' : count <= 3 ? 'moderate' : 'severe');
+  const labelFor = (count) => (count === 0 ? 'Không có' : count === 1 ? 'Nhẹ' : count <= 3 ? 'Vừa' : 'Nặng');
+  const buildStat = (cat) => {
+    const count = countFor(cat);
+    return { count, level: levelFor(count), label: labelFor(count) };
+  };
+
+  const languageStat = raw.stats?.language && Number.isFinite(raw.stats.language.count)
+    ? raw.stats.language
+    : { count: 0, level: 'mild', label: 'Bình thường' };
+
+  return {
+    verdict: raw.verdict || '',
+    parentalGuidance: raw.parentalGuidance || '',
+    stats: {
+      nudity: buildStat('nudity'),
+      violence: buildStat('violence'),
+      horror: buildStat('horror'),
+      language: languageStat
+    },
+    scenes
+  };
+}
+
 export async function enhanceWithGemini(movieData) {
   const geminiKey = getStoredGeminiKey();
   if (!geminiKey) return movieData;
@@ -1259,6 +1315,10 @@ YÊU CẦU CỰC KỲ QUAN TRỌNG VỀ TÊN PHIM, TÓM TẮT VÀ PHÊ BÌNH:
 5. "filmReview": Bài phê bình và nhận định phim chuyên sâu (TỐI ĐA 200 TỪ TIẾNG VIỆT): Đánh giá tổng quan tác phẩm, phân tích những thông điệp và ý nghĩa nhân văn/nghệ thuật sâu sắc của bộ phim, nêu bật các điểm tốt nổi trội (chỉ đạo đạo diễn, diễn xuất, kịch bản, âm nhạc, góc quay) và lý do phim xứng đáng thưởng thức.
 6. "criticConsensus": Nhận định phê bình tiếng Việt phản ánh đúng mức điểm thực tế.
 7. "audienceSentiment": Cảm nhận khán giả tiếng Việt phản ánh đúng mức điểm thực tế.
+8. "contentAdvisory": Phân tích cảnh báo nội dung THỰC TẾ của CHÍNH BỘ PHIM NÀY (không dùng công thức chung, không suy diễn theo thể loại) dựa trên kiến thức thực sự của bạn về phim:
+   - Chỉ liệt kê những cảnh CÓ THẬT mà bạn biết chắc chắn xuất hiện trong phim. Nếu bạn không có đủ thông tin chi tiết về các cảnh cụ thể, hãy để mảng "scenes" rỗng và mọi "count" bằng 0 — TUYỆT ĐỐI KHÔNG bịa đặt cảnh quay không có thật.
+   - "stats.<category>.count" PHẢI bằng chính xác số phần tử có "category" tương ứng trong mảng "scenes" (không được lệch số).
+   - Mốc thời gian "timestamp" ước lượng hợp lý theo thời lượng phim nếu không nhớ chính xác, định dạng "HH:MM:SS - HH:MM:SS".
 
 Trả về duy nhất chuỗi JSON hợp lệ (không kèm markdown format):
 {
@@ -1268,7 +1328,28 @@ Trả về duy nhất chuỗi JSON hợp lệ (không kèm markdown format):
   "detailedPlot": "Tóm tắt toàn bộ cốt truyện đầy đủ chi tiết trọn vẹn từ đầu đến kết cục (tối đa 300 chữ)",
   "filmReview": "Bài phê bình và nhận định phim chuyên sâu, nêu bật ý nghĩa và điểm tốt nổi bật (tối đa 200 chữ)",
   "criticConsensus": "Nhận định phê bình tiếng Việt",
-  "audienceSentiment": "Cảm nhận khán giả tiếng Việt"
+  "audienceSentiment": "Cảm nhận khán giả tiếng Việt",
+  "contentAdvisory": {
+    "verdict": "Câu giải thích lý do phân loại độ tuổi dựa trên nội dung thực tế của phim",
+    "parentalGuidance": "Khuyến nghị dành cho phụ huynh/người xem",
+    "stats": {
+      "nudity": { "count": 0, "level": "none|mild|moderate|severe", "label": "Không có|Nhẹ|Vừa|Nặng" },
+      "violence": { "count": 0, "level": "none|mild|moderate|severe", "label": "Không có|Nhẹ|Vừa|Nặng" },
+      "horror": { "count": 0, "level": "none|mild|moderate|severe", "label": "Không có|Nhẹ|Vừa|Nặng" },
+      "language": { "count": 0, "level": "mild|moderate", "label": "Bình thường|Chửi thề / Gay gắt" }
+    },
+    "scenes": [
+      {
+        "category": "nudity|violence|horror",
+        "timestamp": "00:00:00 - 00:00:00",
+        "title": "Tên ngắn gọn của cảnh",
+        "description": "Mô tả cụ thể cảnh quay có thật trong phim",
+        "intensity": "mild|moderate|severe",
+        "intensityLabel": "Nhẹ|Vừa|Nặng",
+        "isSpoiler": false
+      }
+    ]
+  }
 }
 `;
 
@@ -1313,6 +1394,7 @@ Trả về duy nhất chuỗi JSON hợp lệ (không kèm markdown format):
             : generateFallbackFilmReview({ ...movieData, ...enhanced }),
           criticConsensus: enhanced.criticConsensus || movieData.criticConsensus,
           audienceSentiment: enhanced.audienceSentiment || movieData.audienceSentiment,
+          contentAdvisory: sanitizeContentAdvisory(enhanced.contentAdvisory) || movieData.contentAdvisory,
           enhancedByGemini: true
         };
       }
