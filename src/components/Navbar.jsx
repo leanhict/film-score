@@ -65,7 +65,7 @@ export function Navbar({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Xử lý khi nhấn nút Tìm kiếm hoặc bấm Enter
+  // Xử lý khi nhấn nút Tìm kiếm hoặc bấm Enter: Mặc định tra cứu với Gemini AI
   const handleSearchSubmit = (e) => {
     if (e) e.preventDefault();
     const query = searchQuery.trim();
@@ -79,24 +79,8 @@ export function Navbar({
       inputRef.current.blur();
     }
 
-    // Kiểm tra xem kho phim hiện tại có kết quả nào không
-    const hasLocalMatches = allMovies.some(m => matchMovieSearch(m, query));
-    if (!hasLocalMatches) {
-      onOpenAISearch(query);
-      return;
-    }
-
-    // Nếu có kết quả trong danh sách, cuộn mượt xuống khu vực danh sách phim
-    const mainContent = document.querySelector('.main-content') || document.querySelector('.movies-grid');
-    if (mainContent) {
-      const topOffset = 75;
-      const elementPosition = mainContent.getBoundingClientRect().top;
-      const offsetPosition = elementPosition + window.pageYOffset - topOffset;
-      window.scrollTo({
-        top: Math.max(0, offsetPosition),
-        behavior: 'smooth'
-      });
-    }
+    // Mặc định: Kích hoạt tìm kiếm chuyên sâu với AI
+    onOpenAISearch(query);
   };
 
   // Điều hướng bằng bàn phím
@@ -119,10 +103,12 @@ export function Navbar({
       }
     } else if (e.key === 'Enter') {
       e.preventDefault();
+      // Nếu người dùng chủ động điều hướng mũi tên và chọn 1 gợi ý phim cụ thể
       if (isDropdownOpen && selectedIndex >= 0 && selectedIndex < filteredSuggestions.length) {
         onSelectMovie(filteredSuggestions[selectedIndex]);
         setIsDropdownOpen(false);
       } else {
+        // Mặc định khi bấm Enter: Sử dụng tìm kiếm với AI
         handleSearchSubmit(e);
       }
     } else if (e.key === 'Escape') {
@@ -164,15 +150,15 @@ export function Navbar({
             <button
               type="submit"
               className="nav-search-btn"
-              title="Tìm kiếm"
-              aria-label="Tìm kiếm"
+              title="Bấm để tra cứu phim với AI (Enter)"
+              aria-label="Tra cứu phim với AI"
             >
               <Search size={16} />
             </button>
             <input
               ref={inputRef}
               type="text"
-              placeholder="Tìm phim, đạo diễn, tra cứu AI..."
+              placeholder="Tìm phim, đạo diễn... (Enter để tra cứu AI)"
               value={searchQuery}
               onChange={(e) => {
                 onSearchChange(e.target.value);
@@ -209,7 +195,7 @@ export function Navbar({
               {filteredSuggestions.length > 0 ? (
                 <div className="dropdown-local-results">
                   <div className="dropdown-header-row">
-                    <span className="dropdown-section-label">Gợi ý phim phù hợp:</span>
+                    <span className="dropdown-section-label">Gợi ý phim có sẵn:</span>
                   </div>
                   {filteredSuggestions.map((movie, index) => {
                     const score = calculateUnifiedScore(movie.ratings, weights);
@@ -244,7 +230,28 @@ export function Navbar({
                     );
                   })}
 
-
+                  {/* NÚT TRA CỨU AI NGAY DƯỚI GỢI Ý CÓ SẴN */}
+                  <div
+                    className="dropdown-ai-footer"
+                    onClick={() => {
+                      onOpenAISearch(searchQuery);
+                      setIsDropdownOpen(false);
+                    }}
+                    title="Bấm để tra cứu thông tin phim chi tiết với Gemini AI"
+                  >
+                    <div className="dropdown-ai-footer-left">
+                      <div className="ai-footer-icon-wrap">
+                        <Sparkles size={14} />
+                      </div>
+                      <div className="dropdown-ai-footer-text">
+                        <span className="ai-footer-main">Tra cứu <strong>"{searchQuery}"</strong> với AI</span>
+                        <span className="dropdown-ai-footer-sub">Tìm kiếm đa nguồn & tóm tắt tiếng Việt</span>
+                      </div>
+                    </div>
+                    <div className="dropdown-ai-enter-badge">
+                      <span>Enter</span> ↵
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <div
@@ -261,9 +268,11 @@ export function Navbar({
                     <div className="ai-prompt-title">
                       Tra cứu <strong>"{searchQuery}"</strong> với AI
                     </div>
-                    <span className="ai-prompt-sub">Không có trong kho phim hiện tại • Bấm để AI tìm kiếm & thêm phim</span>
+                    <span className="ai-prompt-sub">Không có trong danh sách hiện tại • Tra cứu tự động với Gemini</span>
                   </div>
-                  <div className="ai-prompt-arrow">→</div>
+                  <div className="dropdown-ai-enter-badge">
+                    <span>Enter</span> ↵
+                  </div>
                 </div>
               )}
             </div>
