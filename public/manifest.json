@@ -1,0 +1,25 @@
+{
+  "name": "FilmScore Hub - Đánh Giá Phim Toàn Diện",
+  "short_name": "FilmScore",
+  "description": "Nền tảng tổng hợp và so sánh điểm số đánh giá phim chuyên sâu từ IMDb, Rotten Tomatoes và Metacritic.",
+  "start_url": "/",
+  "id": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0b0e14",
+  "theme_color": "#0b0e14",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

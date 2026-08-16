@@ -134,7 +134,7 @@ export function Navbar({
           style={{ cursor: 'pointer' }}
         >
           <div className="brand-icon-wrap">
-            <Film size={22} className="brand-film-icon" />
+            <img src="/logo.png" alt="FilmScore Logo" className="brand-logo-img" />
           </div>
           <div className="brand-text">
             <div className="brand-title">

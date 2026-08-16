@@ -20,7 +20,7 @@ export function App() {
   // 1. STATE QUẢN LÝ DỮ LIỆU
   const [movies, setMovies] = useState(() => {
     try {
-      const saved = localStorage.getItem('filmscore_netflix_cat_netflix_trending');
+      const saved = localStorage.getItem('filmscore_netflix_cat_v4_netflix_trending');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
@@ -303,6 +303,7 @@ export function App() {
         <div className="container footer-content">
           <div className="footer-brand">
             <div className="footer-logo">
+              <img src="/logo.png" alt="FilmScore Logo" className="footer-logo-img" />
               <span className="logo-gradient">FilmScore</span>
               <span className="footer-tagline">Netflix Real-time Edition</span>
             </div>

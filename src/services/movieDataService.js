@@ -5,6 +5,7 @@
  */
 
 import { getStoredGeminiKey } from './geminiService.js';
+import { MOCK_MOVIES } from '../data/mockMovies.js';
 import { 
   VIETNAMESE_TITLE_MAP, 
   removeVietnameseTones, 
@@ -723,10 +724,44 @@ async function fetchMovieFromTmdb(tmdbId, imdbIdOverride = null, preferredMediaT
   const genres = (m.genres || []).map(g => g.name || g);
   if (genres.length === 0) genres.push('Chính kịch');
 
-  const director = m.created_by?.map(c => c.name).join(', ') ||
-                   m.credits?.crew?.find(c => c.job === 'Director' || c.job === 'Executive Producer')?.name ||
-                   realOmdbData?.Director || 'Đạo diễn';
-  const cast = (m.credits?.cast || []).slice(0, 5).map(c => c.name);
+  const director = m.credits?.crew?.find(c => c.job === 'Director')?.name ||
+                   m.created_by?.map(c => c.name).join(', ') ||
+                   m.credits?.crew?.find(c => c.job === 'Executive Producer')?.name ||
+                   realOmdbData?.Director || 'Đang cập nhật';
+
+  const writer = m.credits?.crew?.filter(c => c.job === 'Screenplay' || c.job === 'Writer' || c.job === 'Story').map(c => c.name).slice(0, 2).join(', ') ||
+                 (realOmdbData?.Writer && realOmdbData.Writer !== 'N/A' ? realOmdbData.Writer : null);
+
+  const cast = (m.credits?.cast || []).slice(0, 8).map(c => c.name);
+  const castWithRoles = (m.credits?.cast || []).slice(0, 6).map(c => c.character ? `${c.name} (${c.character})` : c.name);
+  const production = (m.production_companies || []).map(p => p.name).filter(Boolean).slice(0, 3).join(', ') ||
+                     (realOmdbData?.Production && realOmdbData.Production !== 'N/A' ? realOmdbData.Production : null);
+
+  let countryFormatted = 'Quốc tế';
+  if (m.production_countries && m.production_countries.length > 0) {
+    const code = m.production_countries[0].iso_3166_1 || '';
+    const name = m.production_countries[0].name || '';
+    if (code === 'US' || name.includes('United States')) countryFormatted = 'Mỹ';
+    else if (code === 'VN' || name.includes('Viet Nam') || name.includes('Vietnam')) countryFormatted = 'Việt Nam';
+    else if (code === 'KR' || name.includes('South Korea') || name.includes('Korea')) countryFormatted = 'Hàn Quốc';
+    else if (code === 'JP' || name.includes('Japan')) countryFormatted = 'Nhật Bản';
+    else if (code === 'GB' || name.includes('United Kingdom')) countryFormatted = 'Anh';
+    else if (code === 'FR' || name.includes('France')) countryFormatted = 'Pháp';
+    else if (code === 'DE' || name.includes('Germany')) countryFormatted = 'Đức';
+    else if (code === 'CN' || name.includes('China')) countryFormatted = 'Trung Quốc';
+    else if (code === 'TH' || name.includes('Thailand')) countryFormatted = 'Thái Lan';
+    else countryFormatted = name;
+  } else if (m.origin_country?.[0] === 'VN' || m.original_language === 'vi') {
+    countryFormatted = 'Việt Nam';
+  } else if (m.origin_country?.[0] === 'KR' || m.original_language === 'ko') {
+    countryFormatted = 'Hàn Quốc';
+  } else if (m.origin_country?.[0] === 'JP' || m.original_language === 'ja') {
+    countryFormatted = 'Nhật Bản';
+  } else if (m.origin_country?.[0] === 'US' || m.original_language === 'en') {
+    countryFormatted = 'Mỹ';
+  } else if (realOmdbData?.Country && realOmdbData.Country !== 'N/A') {
+    countryFormatted = realOmdbData.Country;
+  }
 
   const rawTitle = m.title || m.name;
   const rawOrigTitle = m.original_title || m.original_name || rawTitle;
@@ -797,9 +832,12 @@ async function fetchMovieFromTmdb(tmdbId, imdbIdOverride = null, preferredMediaT
     year: isNaN(year) ? 2024 : year,
     runtime: runtimeFormatted,
     director: director,
+    writer: writer,
     cast: cast.length > 0 ? cast : (realOmdbData?.Actors ? realOmdbData.Actors.split(', ') : ['Đang cập nhật']),
+    castWithRoles: castWithRoles.length > 0 ? castWithRoles : null,
+    production: production,
     genres: genres,
-    country: m.origin_country?.[0] === 'VN' || m.original_language === 'vi' ? 'Việt Nam' : 'Quốc tế',
+    country: countryFormatted,
     poster: poster,
     backdrop: backdrop,
     trailerUrl: trailerUrl,
@@ -835,6 +873,10 @@ async function fetchMovieFromTmdb(tmdbId, imdbIdOverride = null, preferredMediaT
  */
 export async function fetchMovieById(id) {
   if (!id) throw new Error('Mã phim không hợp lệ.');
+
+  // Nếu là phim trong danh sách mẫu MOCK_MOVIES
+  const mockFound = MOCK_MOVIES.find(m => m.id === id);
+  if (mockFound) return mockFound;
 
   // Nếu là ID TMDB (bắt đầu bằng tmdb_)
   if (id.startsWith('tmdb_tv_')) {

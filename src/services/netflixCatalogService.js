@@ -121,7 +121,7 @@ function mapTmdbToFilmScore(m) {
     originalTitle: m.original_title || englishTitle,
     year: isNaN(year) ? 2024 : year,
     runtime: '115 phút',
-    director: m.director || 'Đạo diễn Netflix',
+    director: m.director || null,
     cast: [],
     genres: genresList,
     country: country,
@@ -153,8 +153,8 @@ export async function fetchLiveNetflixCategory(categoryId = 'netflix_trending') 
     return memoryCache.get(categoryId);
   }
 
-  // 2. Kiểm tra LocalStorage (dùng phiên bản v3 để nạp tiêu đề chuẩn hóa mới)
-  const localKey = `filmscore_netflix_cat_v3_${categoryId}`;
+  // 2. Kiểm tra LocalStorage (dùng phiên bản v4 để nạp tiêu đề chuẩn hóa mới)
+  const localKey = `filmscore_netflix_cat_v4_${categoryId}`;
   try {
     const saved = localStorage.getItem(localKey);
     if (saved) {
@@ -256,7 +256,7 @@ async function fetchCategoryFromApi(categoryId) {
     if (list.length > 0) {
       memoryCache.set(categoryId, list);
       try {
-        localStorage.setItem(`filmscore_netflix_cat_v3_${categoryId}`, JSON.stringify(list));
+        localStorage.setItem(`filmscore_netflix_cat_v4_${categoryId}`, JSON.stringify(list));
       } catch (e) {}
       return list;
     }

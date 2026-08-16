@@ -27,8 +27,8 @@ export function MovieDetailModal({
     setCurrentMovie(movie);
     if (!movie) return;
 
-    // Tự động tải thông tin Diễn viên, Đạo diễn thật từ TMDB / IMDb nếu thiếu
-    const needsCredits = (!movie.cast || movie.cast.length === 0 || movie.director === 'Đạo diễn Netflix' || !movie.director) && movie.id;
+    // Tự động tải thông tin Diễn viên, Đạo diễn, Hãng sản xuất thật từ TMDB / IMDb nếu thiếu
+    const needsCredits = (!movie.cast || movie.cast.length === 0 || !movie.director || movie.director === 'Đạo diễn Netflix' || !movie.production) && movie.id;
     if (needsCredits) {
       let isMounted = true;
       fetchMovieById(movie.id)
